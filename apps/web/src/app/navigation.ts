@@ -16,6 +16,7 @@ import {
   Wallet,
   WalletCards,
   Grid3x3,
+  ListChecks,
 } from 'lucide-react';
 import { hasServicePermission, type AuthenticatedStaff, type StaffRole } from '@nayaro/shared';
 
@@ -70,6 +71,13 @@ export const NAVIGATION: readonly NavGroup[] = [
         to: '/tables',
         icon: Grid3x3,
         description: 'Floor plan and table status',
+        isAllowed: takesOrders,
+      },
+      {
+        label: 'Orders',
+        to: '/orders',
+        icon: ListChecks,
+        description: 'Every order in service: kitchen, ready, awaiting payment',
         isAllowed: takesOrders,
       },
       {
@@ -194,7 +202,9 @@ export function visibleNavigation(staff: AuthenticatedStaff): NavGroup[] {
 export function currentSection(pathname: string): { label: string; icon: LucideIcon } | null {
   for (const group of NAVIGATION) {
     for (const item of group.items) {
-      if (pathname === item.to || pathname.startsWith(`${item.to}/`)) {
+      // /orders is the list; /orders/<id> and /orders/takeaway are other screens.
+      const nested = item.to !== '/orders' && pathname.startsWith(`${item.to}/`);
+      if (pathname === item.to || nested) {
         return { label: item.label, icon: item.icon };
       }
     }

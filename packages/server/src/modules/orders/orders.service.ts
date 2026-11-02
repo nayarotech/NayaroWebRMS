@@ -113,6 +113,23 @@ export async function listOpenTakeaways(
   return { orders: orders.map(toOrderDto) };
 }
 
+/**
+ * Every order still in service - tables and takeaways together - for the
+ * front desk's Orders screen. Same `closedAt: null` bound as the floor, so it
+ * stays a list of work in progress rather than growing into history.
+ */
+export async function listOpenOrders(
+  prisma: NayaroPrismaClient,
+  restaurantId: string,
+): Promise<MaybeOrderListResponse> {
+  const orders = await prisma.order.findMany({
+    where: { restaurantId, closedAt: null },
+    orderBy: { createdAt: 'asc' },
+    select: ORDER_SELECT,
+  });
+  return { orders: orders.map(toOrderDto) };
+}
+
 // ---------------------------------------------------------------------------
 // Add an item - the only operation that can bring an Order into existence
 // ---------------------------------------------------------------------------

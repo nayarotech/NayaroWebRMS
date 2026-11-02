@@ -49,7 +49,7 @@ export function DayChecklist({ report }: { readonly report: DailyReportResponse 
                 {index > 0 && ', '}
                 <Link to={`/billing/${order.orderId}`} className="font-bold underline-offset-2 hover:underline">
                   #{order.orderNumber}
-                  {order.tableName === null ? '' : ` ${order.tableName}`}
+                  {` ${order.tableName ?? 'Takeaway'}`}
                 </Link>
               </span>
             ))}

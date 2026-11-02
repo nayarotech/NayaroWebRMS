@@ -309,7 +309,7 @@ async function main(): Promise<void> {
 
     r = await call('POST', '/management/menu/categories', {
       token: manager,
-      body: { name: 'Momo', nameNp: 'मम' },
+      body: { name: 'Momo', nameNp: 'मोमो' },
     });
     check('create category -> 201', r.status === 201, r.status);
     r = await call('POST', '/management/menu/categories', {
@@ -337,7 +337,7 @@ async function main(): Promise<void> {
     const drinksCat = findCategory(menu, 'Drinks');
     r = await call('POST', '/management/menu/items', {
       token: manager,
-      body: { categoryId: momoCat?.id, name: 'Chicken Momo', nameNp: 'चिकन मम', pricePaisa: 22000 },
+      body: { categoryId: momoCat?.id, name: 'Chicken Momo', nameNp: 'चिकन मोमो', pricePaisa: 22000 },
     });
     check('create item -> 201', r.status === 201, r.status);
     r = await call('POST', '/management/menu/items', {

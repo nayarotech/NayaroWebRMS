@@ -96,7 +96,7 @@ export function PaymentsCard({ report }: { readonly report: DailyReportResponse 
             {payments.outstandingPaisa > 0 && (
               <MoneyRow
                 label="Still unpaid"
-                hint={`${String(payments.unpaidInvoiceCount)} bills`}
+                hint={`${String(payments.unpaidInvoiceCount)} bill${payments.unpaidInvoiceCount === 1 ? '' : 's'}`}
                 value={payments.outstandingPaisa}
                 tone="warn"
               />

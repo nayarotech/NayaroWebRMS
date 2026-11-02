@@ -25,6 +25,11 @@ export function fetchOpenTakeaways(): Promise<MaybeOrderListResponse> {
   return apiClient.get<MaybeOrderListResponse>('/orders/takeaway/open');
 }
 
+/** Every order still in service: tables and takeaways. */
+export function fetchOpenOrders(): Promise<MaybeOrderListResponse> {
+  return apiClient.get<MaybeOrderListResponse>('/orders/open');
+}
+
 export function fetchOrder(orderId: string): Promise<OrderResponse> {
   return apiClient.get<OrderResponse>(`/orders/${orderId}`);
 }

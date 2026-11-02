@@ -138,7 +138,7 @@ async function main(): Promise<void> {
     });
 
     const category = await prisma.menuCategory.create({
-      data: { restaurantId: restaurant.id, name: 'Momo', nameNp: 'मम' },
+      data: { restaurantId: restaurant.id, name: 'Momo', nameNp: 'मोमो' },
     });
     const drinks = await prisma.menuCategory.create({
       data: { restaurantId: restaurant.id, name: 'Drinks', nameNp: 'पेय', sortOrder: 1 },
@@ -148,7 +148,7 @@ async function main(): Promise<void> {
         restaurantId: restaurant.id,
         categoryId: category.id,
         name: 'Chicken Momo',
-        nameNp: 'चिकन मम',
+        nameNp: 'चिकन मोमो',
         pricePaisa: 22000,
       },
     });
@@ -188,7 +188,7 @@ async function main(): Promise<void> {
     const menu = r.body as MenuResponse;
     const allItems = menu.categories.flatMap((c) => c.items.map((i) => i.name));
     check('categories ordered by sortOrder', menu.categories[0]?.name === 'Momo');
-    check('Nepali names present', menu.categories[0]?.nameNp === 'मम');
+    check('Nepali names present', menu.categories[0]?.nameNp === 'मोमो');
     check(
       'sellable items returned',
       allItems.includes('Chicken Momo') && allItems.includes('Coke'),
@@ -240,7 +240,7 @@ async function main(): Promise<void> {
     check('subtotal = 220.00', order.subtotalPaisa === 22000, order.subtotalPaisa);
     check('line total computed', order.items[0]?.lineTotalPaisa === 22000);
     check('name snapshot taken', order.items[0]?.name === 'Chicken Momo');
-    check('Nepali snapshot taken', order.items[0]?.nameNp === 'चिकन मम');
+    check('Nepali snapshot taken', order.items[0]?.nameNp === 'चिकन मोमो');
     check('exactly one Order row exists', (await prisma.order.count()) === 1);
 
     const stored = await prisma.order.findFirstOrThrow();

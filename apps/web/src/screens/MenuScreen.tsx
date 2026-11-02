@@ -141,8 +141,8 @@ export function MenuScreen(): JSX.Element {
                 managementApi.updateCategory(category.id, { isActive: !category.isActive }),
               )
             }
-            onRename={(category, name) =>
-              void actions.run(() => managementApi.updateCategory(category.id, { name }))
+            onRename={(category, name, nameNp) =>
+              void actions.run(() => managementApi.updateCategory(category.id, { name, nameNp }))
             }
           />
 
@@ -177,7 +177,7 @@ export function MenuScreen(): JSX.Element {
           title="Add a category"
           fields={[
             { key: 'name', label: 'Name', placeholder: 'Momo' },
-            { key: 'nameNp', label: 'Nepali name (optional)', placeholder: 'मम' },
+            { key: 'nameNp', label: 'Nepali name (optional)', placeholder: 'मोमो' },
           ]}
           busy={actions.isSaving}
           onCancel={() => {
@@ -207,7 +207,7 @@ export function MenuScreen(): JSX.Element {
           }
           fields={[
             { key: 'name', label: 'Name', placeholder: 'Chicken Momo' },
-            { key: 'nameNp', label: 'Nepali name (optional)', placeholder: 'चिकन मम' },
+            { key: 'nameNp', label: 'Nepali name (optional)', placeholder: 'चिकन मोमो' },
             { key: 'price', label: 'Price (₨)', placeholder: '220' },
           ]}
           busy={actions.isSaving}
@@ -264,10 +264,11 @@ function CategoryList({
   busy: boolean;
   onSelect: (id: string) => void;
   onToggleActive: (category: ManagedMenuCategory) => void;
-  onRename: (category: ManagedMenuCategory, name: string) => void;
+  onRename: (category: ManagedMenuCategory, name: string, nameNp: string | null) => void;
 }): JSX.Element {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
+  const [draftNp, setDraftNp] = useState('');
 
   return (
     <section aria-label="Categories">
@@ -288,11 +289,14 @@ function CategoryList({
           >
             {renamingId === category.id ? (
               <form
-                className="flex gap-1.5"
+                className="flex flex-wrap gap-1.5"
                 onSubmit={(event) => {
                   event.preventDefault();
                   const trimmed = draft.trim();
-                  if (trimmed.length > 0 && trimmed !== category.name) onRename(category, trimmed);
+                  const trimmedNp = draftNp.trim().length > 0 ? draftNp.trim() : null;
+                  if (trimmed.length > 0 && (trimmed !== category.name || trimmedNp !== category.nameNp)) {
+                    onRename(category, trimmed, trimmedNp);
+                  }
                   setRenamingId(null);
                 }}
               >
@@ -308,7 +312,20 @@ function CategoryList({
                   onKeyDown={(event) => {
                     if (event.key === 'Escape') setRenamingId(null);
                   }}
-                  className="bg-field border-accent-hover min-w-0 flex-1 rounded-lg border px-2 py-1 text-[13px] outline-none"
+                  className="bg-field border-accent-hover min-w-0 flex-1 basis-full rounded-lg border px-2 py-1 text-[13px] outline-none"
+                />
+                <input
+                  aria-label="Nepali name"
+                  placeholder="Nepali name (optional)"
+                  value={draftNp}
+                  maxLength={80}
+                  onChange={(event) => {
+                    setDraftNp(event.target.value);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape') setRenamingId(null);
+                  }}
+                  className="bg-field border-border-3 focus:border-accent-hover min-w-0 flex-1 rounded-lg border px-2 py-1 text-[13px] outline-none"
                 />
                 <MiniButton busy={busy} type="submit">
                   Save
@@ -338,6 +355,7 @@ function CategoryList({
                     busy={busy}
                     onClick={() => {
                       setDraft(category.name);
+                      setDraftNp(category.nameNp ?? '');
                       setRenamingId(category.id);
                     }}
                   >

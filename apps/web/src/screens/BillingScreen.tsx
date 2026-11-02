@@ -140,8 +140,13 @@ export function BillingScreen(): JSX.Element {
         )}
       </div>
 
-      <aside id="order-panel" className="w-full shrink-0 scroll-mt-20 md:sticky md:top-6 md:w-[320px] lg:w-[380px] xl:w-[420px]">
-        <div className="border-border-2 bg-surface flex md:max-h-[calc(100dvh-8.5rem)] flex-col overflow-hidden rounded-card border">
+      <aside
+        id="order-panel"
+        className="w-full shrink-0 scroll-mt-20 md:sticky md:top-6 md:w-[320px] lg:w-[380px] xl:w-[420px]"
+      >
+        {/* One scroll area for the whole panel, so the pay button pinned to its
+            bottom edge (see PaymentPanel) is never clipped by a nested scroller. */}
+        <div className="border-border-2 bg-surface flex flex-col overflow-y-auto rounded-card border md:max-h-[calc(100dvh-8.5rem)]">
           <header
             className={cn(
               'border-border border-b px-5 py-4',
@@ -183,7 +188,7 @@ export function BillingScreen(): JSX.Element {
             </p>
           )}
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          <div className="px-5 py-4">
             {preBill?.kitchenWarning != null && (
               <p className="border-warn/40 bg-warn/10 text-warn-fg mb-3 rounded-xl border px-3 py-2 text-[12px] font-semibold">
                 {preBill.kitchenWarning}
@@ -224,7 +229,7 @@ export function BillingScreen(): JSX.Element {
             )}
           </div>
 
-          <footer className="border-border bg-surface-2 max-h-[60vh] shrink-0 overflow-y-auto border-t px-5 py-4">
+          <footer className="border-border bg-surface-2 border-t px-5 py-4">
             {preBill !== null && <IssueForm preBill={preBill} actions={{ ...actions }} />}
             {/*
              * Voiding is offered only on a live, unpaid bill. The server

@@ -69,7 +69,7 @@ export function Sidebar({ collapsed, onToggle, onNavigate, className }: SidebarP
                 <li key={to}>
                   <NavLink
                     to={to}
-                    end={to === '/orders/takeaway'}
+                    end={to === '/orders/takeaway' || to === '/orders'}
                     onClick={onNavigate}
                     title={collapsed ? `${label} – ${description}` : undefined}
                     className={({ isActive }) =>

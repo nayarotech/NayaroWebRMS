@@ -102,13 +102,13 @@ type Catalogue = readonly {
 const HIMALAYAN_MENU: Catalogue = [
   {
     name: 'Momo',
-    np: 'मम',
+    np: 'मोमो',
     items: [
-      ['Chicken Momo', 'चिकन मम', 22000],
-      ['Veg Momo', 'भेज मम', 18000],
-      ['Buff Momo', 'बफ मम', 20000],
-      ['Chicken Jhol Momo', 'चिकन झोल मम', 26000],
-      ['C-Momo Chilli', 'सी-मम चिल्ली', 28000],
+      ['Chicken Momo', 'चिकन मोमो', 22000],
+      ['Veg Momo', 'भेज मोमो', 18000],
+      ['Buff Momo', 'बफ मोमो', 20000],
+      ['Chicken Jhol Momo', 'चिकन झोल मोमो', 26000],
+      ['C-Momo Chilli', 'सी-मोमो चिल्ली', 28000],
     ],
   },
   {

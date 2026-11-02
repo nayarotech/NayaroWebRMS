@@ -1,4 +1,4 @@
-import { useMemo, useState, type JSX } from 'react';
+import { useMemo, useRef, useState, type JSX } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Ban, CheckCircle2, PackageX, RefreshCw, Search, UtensilsCrossed } from 'lucide-react';
 import type { AvailabilityResponse } from '@nayaro/shared';
@@ -15,9 +15,13 @@ import { cn } from '@/lib/utils';
 
 type Filter = 'all' | 'available' | 'off';
 
+const QUICK_REASONS = ['Ran out', 'Ingredient finished', 'Kitchen equipment issue', 'Back in stock'] as const;
+
 export function AvailabilityScreen(): JSX.Element {
   const action = useOperation();
   const [reason, setReason] = useState('');
+  const [nudge, setNudge] = useState(false);
+  const reasonRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
   const data = useQuery({
@@ -81,21 +85,45 @@ export function AvailabilityScreen(): JSX.Element {
 
         <Card className="p-4">
           <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
-            <Field
-              label="Reason for the change"
-              hint={reasonReady ? 'Recorded with every change below.' : 'Enter a reason (3+ characters) to enable the buttons, e.g. “Ran out of chicken”.'}
-            >
-              {({ id, describedBy }) => (
-                <Input
-                  id={id}
-                  aria-describedby={describedBy}
-                  value={reason}
-                  maxLength={300}
-                  placeholder="Why is availability changing?"
-                  onChange={(event) => setReason(event.target.value)}
-                />
-              )}
-            </Field>
+            <div>
+              <Field
+                label="Reason for the change"
+                hint={reasonReady ? 'Recorded with every change below.' : 'Pick or type a reason, then tap Sold out or Available on any dish.'}
+                {...(nudge && !reasonReady ? { error: 'Add a reason first - it is recorded with the change.' } : {})}
+              >
+                {({ id, describedBy, invalid }) => (
+                  <Input
+                    ref={reasonRef}
+                    id={id}
+                    aria-describedby={describedBy}
+                    aria-invalid={invalid}
+                    value={reason}
+                    maxLength={300}
+                    placeholder="Why is availability changing?"
+                    onChange={(event) => setReason(event.target.value)}
+                  />
+                )}
+              </Field>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {QUICK_REASONS.map((quick) => (
+                  <button
+                    key={quick}
+                    type="button"
+                    onClick={() => {
+                      setReason(quick);
+                    }}
+                    className={cn(
+                      'rounded-full border px-2.5 py-1 text-caption font-semibold transition-colors',
+                      reason === quick
+                        ? 'border-accent bg-accent-soft text-accent-hover'
+                        : 'border-border-2 text-muted hover:border-border-4 hover:text-text-2',
+                    )}
+                  >
+                    {quick}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative">
                 <Search
@@ -202,15 +230,21 @@ export function AvailabilityScreen(): JSX.Element {
                       <Button
                         size="sm"
                         variant={row.isAvailable ? 'danger' : 'primary'}
-                        disabled={action.busy || !reasonReady}
-                        title={reasonReady ? undefined : 'Enter a reason first'}
-                        onClick={() =>
+                        disabled={action.busy}
+                        onClick={() => {
+                          // A reason is required, but a disabled button does not say
+                          // why. Clicking takes the cashier to the box instead.
+                          if (!reasonReady) {
+                            setNudge(true);
+                            reasonRef.current?.focus();
+                            return;
+                          }
                           void action.run(`/menu/availability/${row.id}`, {
                             expectedIsAvailable: row.isAvailable,
                             isAvailable: !row.isAvailable,
                             reason,
-                          })
-                        }
+                          });
+                        }}
                       >
                         {row.isAvailable ? 'Sold out' : 'Available'}
                       </Button>

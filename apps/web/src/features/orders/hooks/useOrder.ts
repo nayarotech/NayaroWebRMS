@@ -49,6 +49,15 @@ export function useOpenTakeaways(): UseQueryResult<MaybeOrderListResponse, Error
   });
 }
 
+/** Every open order - dine-in and takeaway - for the front desk's Orders screen. */
+export function useOpenOrders(): UseQueryResult<MaybeOrderListResponse, Error> {
+  return useQuery({
+    queryKey: [...ORDER_KEY, 'open'],
+    queryFn: () => ordersApi.fetchOpenOrders(),
+    refetchInterval: 30_000,
+  });
+}
+
 export function useMenu(): UseQueryResult<MenuResponse, Error> {
   return useQuery({
     queryKey: MENU_KEY,

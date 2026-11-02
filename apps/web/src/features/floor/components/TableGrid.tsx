@@ -1,4 +1,5 @@
 import type { JSX } from 'react';
+import { Plus } from 'lucide-react';
 import type { FloorArea, FloorTable } from '@nayaro/shared';
 import { TableCard } from './TableCard';
 
@@ -10,6 +11,9 @@ export interface TableGridProps {
   readonly onOpenTable?: (table: FloorTable) => void;
   /** Opens the bill for a table. Omitted for roles that cannot bill. */
   readonly onBillTable?: (table: FloorTable) => void;
+  /** Floor configuration, for owners and managers only. */
+  readonly onEditTable?: (table: FloorTable, area: FloorArea) => void;
+  readonly onAddTable?: (area: FloorArea) => void;
 }
 
 /**
@@ -26,6 +30,8 @@ export function TableGrid({
   showAreaNames,
   onOpenTable,
   onBillTable,
+  onEditTable,
+  onAddTable,
 }: TableGridProps): JSX.Element {
   return (
     <div className="flex flex-col gap-7">
@@ -45,7 +51,7 @@ export function TableGrid({
             </div>
           )}
 
-          {area.tables.length === 0 ? (
+          {area.tables.length === 0 && onAddTable === undefined ? (
             <p className="border-border-2 text-muted-2 rounded-card border border-dashed px-4 py-6 text-[13px]">
               No tables in {area.name} yet.
             </p>
@@ -58,8 +64,22 @@ export function TableGrid({
                   {...(showAreaNames ? {} : { areaName: area.name })}
                   {...(onOpenTable === undefined ? {} : { onOpen: onOpenTable })}
                   {...(onBillTable === undefined ? {} : { onBill: onBillTable })}
+                  {...(onEditTable === undefined ? {} : { onEdit: (t: FloorTable) => onEditTable(t, area) })}
                 />
               ))}
+              {onAddTable !== undefined && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onAddTable(area);
+                  }}
+                  className="border-border-3 text-muted hover:border-accent hover:text-accent hover:bg-accent-soft flex min-h-[132px] flex-col items-center justify-center gap-1.5 rounded-card border-2 border-dashed text-[13px] font-bold transition-colors"
+                >
+                  <Plus size={20} aria-hidden />
+                  Add table
+                  <span className="text-muted-2 text-[11px] font-semibold">to {area.name}</span>
+                </button>
+              )}
             </div>
           )}
         </section>

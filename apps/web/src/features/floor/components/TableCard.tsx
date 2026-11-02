@@ -1,4 +1,5 @@
 import type { JSX } from 'react';
+import { Pencil } from 'lucide-react';
 import type { FloorTable } from '@nayaro/shared';
 import { cn } from '@/lib/utils';
 import { TABLE_STATUS_PRESENTATION } from '../tableStatus';
@@ -15,6 +16,8 @@ export interface TableCardProps {
    * all, whose whole distinction from a cashier is that they do not.
    */
   readonly onBill?: (table: FloorTable) => void;
+  /** Opens the table editor. Only for roles that configure the floor. */
+  readonly onEdit?: (table: FloorTable) => void;
 }
 
 /**
@@ -32,7 +35,7 @@ export interface TableCardProps {
  * status is stated in words as well as colour, and the whole card is tinted so
  * a busy table is visible in peripheral vision.
  */
-export function TableCard({ table, areaName, onOpen, onBill }: TableCardProps): JSX.Element {
+export function TableCard({ table, areaName, onOpen, onBill, onEdit }: TableCardProps): JSX.Element {
   const presentation = TABLE_STATUS_PRESENTATION[table.status];
   const interactive = onOpen !== undefined && table.isActive;
 
@@ -93,7 +96,7 @@ export function TableCard({ table, areaName, onOpen, onBill }: TableCardProps): 
         onBill(table);
       }}
       className={cn(
-        'mt-1.5 w-full rounded-xl border px-3 py-2 text-[12.5px] font-bold transition-colors',
+        'w-full rounded-xl border px-3 py-2 text-[12.5px] font-bold transition-colors',
         'focus-visible:ring-accent-hover/50 outline-none focus-visible:ring-2',
         awaitingPayment
           ? // The bill is already issued and money is owed. This is the most
@@ -106,13 +109,40 @@ export function TableCard({ table, areaName, onOpen, onBill }: TableCardProps): 
     </button>
   ) : null;
 
+  const editButton =
+    onEdit === undefined ? null : (
+      <button
+        type="button"
+        aria-label={`Edit ${table.name}`}
+        title="Edit table"
+        onClick={() => {
+          onEdit(table);
+        }}
+        className={cn(
+          'border-border-3 text-muted hover:border-accent hover:text-accent grid shrink-0 place-items-center rounded-xl border px-2.5 py-2 transition-colors',
+          'focus-visible:ring-accent-hover/50 outline-none focus-visible:ring-2',
+          billStrip === null && 'flex w-full items-center justify-center gap-1.5 text-[12.5px] font-bold',
+        )}
+      >
+        <Pencil size={14} aria-hidden />
+        {billStrip === null && 'Edit'}
+      </button>
+    );
+  const actions =
+    billStrip === null && editButton === null ? null : (
+      <div className="mt-1.5 flex gap-1.5">
+        {billStrip}
+        {editButton}
+      </div>
+    );
+
   if (!interactive) {
     return (
       <div>
         <article aria-label={label} className={shell}>
           {body}
         </article>
-        {billStrip}
+        {actions}
       </div>
     );
   }
@@ -133,7 +163,7 @@ export function TableCard({ table, areaName, onOpen, onBill }: TableCardProps): 
       >
         {body}
       </button>
-      {billStrip}
+      {actions}
     </div>
   );
 }

@@ -58,7 +58,8 @@ export function MoneyRow({
         {hint !== undefined && <span className="text-muted-2 ml-1.5 text-caption font-medium">{hint}</span>}
       </span>
       <span className={cn('font-mono tabular-nums', tone !== undefined && TONE_TEXT[tone])}>
-        {formatPaisa(value)}
+        {/* `-0` (a zero discount negated) would print as "₨ -0.00". */}
+        {formatPaisa(value === 0 ? 0 : value)}
       </span>
     </div>
   );

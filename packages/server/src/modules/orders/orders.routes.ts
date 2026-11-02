@@ -69,6 +69,12 @@ export function createOrdersRouter(deps: OrdersRouterDeps): Router {
     res.json(await menuService.getMenu(deps.prisma, staff.restaurantId));
   });
 
+  // Registered before /orders/:orderId, which would otherwise read "open" as an id.
+  router.get('/orders/open', requireServicePermission('TAKE_ORDERS'), async (req, res) => {
+    const { staff } = requireAuthContext(req);
+    res.json(await ordersService.listOpenOrders(deps.prisma, staff.restaurantId));
+  });
+
   router.get('/orders/:orderId', requireServicePermission('TAKE_ORDERS'), async (req, res) => {
     const { staff } = requireAuthContext(req);
     res.json(

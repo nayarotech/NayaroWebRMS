@@ -405,31 +405,35 @@ export function PaymentPanel({
             </p>
           )}
 
-          <Button
-            type="submit"
-            size="lg"
-            className="w-full"
-            loading={busy}
-            disabled={busy || !creditValid || !amountValid || !tenderValid}
-          >
-            {/*
-             * "Confirm" for QR and card, because Nayaro RMS has not verified
-             * anything with a payment provider - a cashier is telling the
-             * system what they saw happen on another device.
-             */}
-            {method === 'CASH'
-              ? amountPaisa === remaining
-                ? 'Complete Payment'
-                : 'Add Payment'
-              : method === 'CREDIT'
-                ? 'Mark as Credit'
-                : `Confirm ${method === 'QR' ? 'QR' : 'Card'} Payment`}
-          </Button>
-          {amountValid && amountPaisa !== null && (
-            <p className="text-muted mt-2 text-xs" aria-live="polite">
-              After this payment: {formatPaisa(remaining - amountPaisa)} remaining.
-            </p>
-          )}
+          {/* Pinned to the bottom of the bill panel's scroll area: the one control
+              the cashier must reach, whatever the window height. */}
+          <div className="bg-surface-2 sticky bottom-0 -mx-5 -mb-4 px-5 pt-3 pb-4">
+            <Button
+              type="submit"
+              size="lg"
+              className="w-full"
+              loading={busy}
+              disabled={busy || !creditValid || !amountValid || !tenderValid}
+            >
+              {/*
+               * "Confirm" for QR and card, because Nayaro RMS has not verified
+               * anything with a payment provider - a cashier is telling the
+               * system what they saw happen on another device.
+               */}
+              {method === 'CASH'
+                ? amountPaisa === remaining
+                  ? 'Complete Payment'
+                  : 'Add Payment'
+                : method === 'CREDIT'
+                  ? 'Mark as Credit'
+                  : `Confirm ${method === 'QR' ? 'QR' : 'Card'} Payment`}
+            </Button>
+            {amountValid && amountPaisa !== null && (
+              <p className="text-muted mt-2 text-xs" aria-live="polite">
+                After this payment: {formatPaisa(remaining - amountPaisa)} remaining.
+              </p>
+            )}
+          </div>
         </form>
       )}
       {addingCustomer && (

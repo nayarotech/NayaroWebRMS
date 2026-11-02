@@ -197,8 +197,10 @@ function Selection({
         </>
       ) : (
         <p className="text-muted mt-2 text-sm">
-          {data.statement?.customerName ?? 'Customer'} · {data.statement?.balancePoints ?? 0} points
-          available. Loyalty choices are fixed after issuing the bill.
+          {data.statement === null || data.statement === undefined
+            ? 'No customer was added to this bill. '
+            : `${data.statement.customerName} · ${String(data.statement.balancePoints)} points available. `}
+          Loyalty choices are fixed after issuing the bill.
         </p>
       )}
       {canReturnRewards && data.rewardOnlyInvoiceId && (

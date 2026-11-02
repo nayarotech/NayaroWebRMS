@@ -11,6 +11,7 @@ import { AreaTabs, type AreaSelection } from '@/features/floor/components/AreaTa
 import { FloorEmptyState } from '@/features/floor/components/FloorEmptyState';
 import { FloorSettingsDialog } from '@/features/floor/components/FloorSettingsDialog';
 import { TableGrid } from '@/features/floor/components/TableGrid';
+import { TableEditorDialog, type TableEditorTarget } from '@/features/floor/components/TableEditorDialog';
 import { useFloor, useFloorRealtime } from '@/features/floor/hooks/useFloor';
 import { useOpenTakeaways } from '@/features/orders/hooks/useOrder';
 import { formatPaisa } from '@/lib/money';
@@ -35,6 +36,7 @@ export function TablesScreen(): JSX.Element {
 
   const [selection, setSelection] = useState<AreaSelection>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [editorTarget, setEditorTarget] = useState<TableEditorTarget | null>(null);
 
   const canConfigure = staff?.role === 'OWNER' || staff?.role === 'MANAGER';
   const canTakeOrders = staff !== null && hasServicePermission(staff, 'TAKE_ORDERS');
@@ -125,7 +127,7 @@ export function TablesScreen(): JSX.Element {
                   + Takeaway
                 </Button>
               )}
-              {canConfigure && totalTables > 0 && (
+              {canConfigure && areas.length > 0 && (
                 <Button
                   variant="secondary"
                   onClick={() => {
@@ -196,10 +198,29 @@ export function TablesScreen(): JSX.Element {
             showAreaNames={selection === null}
             {...(canTakeOrders ? { onOpenTable: openTable } : {})}
             {...(canBill ? { onBillTable: billTable } : {})}
+            {...(canConfigure
+              ? {
+                  onAddTable: (area: FloorArea) => {
+                    setEditorTarget({ mode: 'add', areaId: area.id });
+                  },
+                  onEditTable: (table: FloorTable, area: FloorArea) => {
+                    setEditorTarget({ mode: 'edit', table, areaId: area.id });
+                  },
+                }
+              : {})}
           />
         </>
       )}
 
+      {canConfigure && (
+        <TableEditorDialog
+          target={editorTarget}
+          areas={areas}
+          onClose={() => {
+            setEditorTarget(null);
+          }}
+        />
+      )}
       {canConfigure && (
         <FloorSettingsDialog
           open={settingsOpen}

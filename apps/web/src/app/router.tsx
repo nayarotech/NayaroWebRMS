@@ -13,6 +13,9 @@ const DashboardScreen = lazy(() =>
 const TablesScreen = lazy(() =>
   import('@/screens/TablesScreen').then((module) => ({ default: module.TablesScreen })),
 );
+const OrdersScreen = lazy(() =>
+  import('@/screens/OrdersScreen').then((module) => ({ default: module.OrdersScreen })),
+);
 const OrderScreen = lazy(() =>
   import('@/screens/OrderScreen').then((module) => ({ default: module.OrderScreen })),
 );
@@ -116,6 +119,7 @@ export const router = createBrowserRouter([
           { path: '/menu', element: guard(MANAGEMENT, <MenuScreen />) },
           { path: '/staff', element: guard(MANAGEMENT, <StaffScreen />) },
           { path: '/payroll', element: guard(roles('OWNER'), <PayrollScreen />) },
+          { path: '/orders', element: guard(TAKES_ORDERS, <OrdersScreen />) },
           {
             path: '/orders/table/:tableId',
             element: guard(TAKES_ORDERS, <OrderScreen mode="table" />),

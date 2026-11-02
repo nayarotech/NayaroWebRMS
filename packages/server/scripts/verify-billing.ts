@@ -453,7 +453,7 @@ async function main(): Promise<void> {
         restaurantId: restaurant.id,
         categoryId: category.id,
         name: 'Chicken Momo',
-        nameNp: 'चिकन मम',
+        nameNp: 'चिकन मोमो',
         pricePaisa: 22000,
       },
     });
