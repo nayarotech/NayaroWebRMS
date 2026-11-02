@@ -1,0 +1,61 @@
+{
+  "name": "@nayaro/server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Nayaro RMS Cloud API: multi-tenant Express REST API and Socket.IO.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "dev": "tsx watch --clear-screen=false scripts/start.ts",
+    "start": "tsx scripts/start.ts",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "demo:seed": "tsx scripts/seed-demo.ts",
+    "tenant": "tsx scripts/tenant.ts",
+    "test": "tsx scripts/verify-saas.ts",
+    "verify": "tsx scripts/verify-server.ts",
+    "typecheck": "tsc --noEmit",
+    "verify:auth": "tsx scripts/verify-auth.ts",
+    "verify:floor": "tsx scripts/verify-floor.ts",
+    "verify:orders": "tsx scripts/verify-orders.ts",
+    "verify:kitchen": "tsx scripts/verify-kitchen.ts",
+    "verify:billing": "tsx scripts/verify-billing.ts",
+    "verify:payments": "tsx scripts/verify-payments.ts",
+    "verify:split-payments": "tsx scripts/verify-split-payments.ts",
+    "verify:customer-menu": "node --import tsx scripts/verify-customer-menu.ts",
+    "verify:payroll": "node --import tsx scripts/verify-payroll.ts",
+    "verify:loyalty": "node --import tsx scripts/verify-loyalty.ts",
+    "verify:offers": "node --import tsx scripts/verify-offers.ts",
+    "verify:combos": "node --import tsx scripts/verify-combos.ts",
+    "verify:operations": "tsx scripts/verify-operations.ts",
+    "verify:management": "tsx scripts/verify-management.ts",
+    "verify:corrections": "tsx scripts/verify-corrections.ts",
+    "verify:history": "tsx scripts/verify-history.ts",
+    "verify:reports": "tsx scripts/verify-reports.ts",
+    "verify:service-duties": "tsx scripts/verify-service-duties.ts",
+    "verify:kitchen-progress": "tsx scripts/verify-kitchen-progress.ts",
+    "verify:safe-retries": "tsx scripts/verify-safe-retries.ts",
+    "verify:credit": "tsx scripts/verify-credit.ts",
+    "verify:table-transfers": "tsx scripts/verify-table-transfers.ts",
+    "test:all": "tsx scripts/run-all.ts"
+  },
+  "dependencies": {
+    "@nayaro/database": "*",
+    "@nayaro/shared": "*",
+    "bikram-sambat": "1.8.1",
+    "cors": "2.8.6",
+    "express": "5.2.1",
+    "socket.io": "4.8.3",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@types/cors": "2.8.19",
+    "@types/express": "5.0.6",
+    "nepali-datetime": "^2.0.0",
+    "socket.io-client": "4.8.3",
+    "tsx": "4.23.13"
+  }
+}

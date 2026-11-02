@@ -1,0 +1,33 @@
+# dependencies
+node_modules/
+
+# build output
+out/
+dist/
+.vite/
+*.tsbuildinfo
+
+# local data / secrets
+.env
+.env.local
+*.local
+
+# databases (never commit restaurant data)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# logs
+*.log
+npm-debug.log*
+
+# os
+.DS_Store
+Thumbs.db
+
+# database: local data and generated Prisma client (never commit either)
+packages/database/.nayaro-dev/
+packages/database/src/generated/
+packages/server/.nayaro-verify/
+packages/server/.data/

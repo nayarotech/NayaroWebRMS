@@ -1,0 +1,6 @@
+-- CreateTable
+CREATE TABLE "_nayaro_health_probe" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "note" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

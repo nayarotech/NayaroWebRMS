@@ -1,0 +1,1285 @@
+// Nayaro RMS - production domain schema (Phase 3).
+//
+// CONVENTIONS, enforced throughout:
+//   *Paisa   integer minor currency units. Rs 180.50 -> 18050. Never a float.
+//   *Bp      integer basis points. 13% -> 1300, 8.5% -> 850. Never a float.
+//   businessDate is a STRING "YYYY-MM-DD", not DateTime: it is a local
+//            calendar concept, and typing it as an instant would smuggle
+//            timezone ambiguity back into billing.
+//   fiscalYearStartBsYear is an INT (2082 = FY 2082/83). "2082/83" is a
+//            display format only, so one fiscal year has exactly one
+//            representation in the database.
+//   Money columns are Prisma `Int` (32-bit) -> max single amount
+//            Rs 21,474,836.47. Ample for one restaurant bill. Aggregates are
+//            summed in JS (exact to 2^53), never accumulated into a column.
+//
+// Business history (Order, OrderItem, Kot, Invoice, Payment and their children)
+// is never hard-deleted. Configuration uses isActive instead.
+
+generator client {
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  // Verified against Prisma 7.10 + SQLite: emits real
+  // `CREATE UNIQUE INDEX ... WHERE ...` partial indexes.
+  previewFeatures = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+/// Who someone is on the floor, and therefore what the server will let them do.
+///
+/// WAITER and CASHIER are deliberately separate, because in a restaurant they
+/// are separate people with separate authority. A waiter takes orders and
+/// sends them to the kitchen; a cashier settles bills and handles money. The
+/// same person often does both, and when they do they get a cashier account -
+/// but the software must not force that, because "whoever took the order can
+/// also discount it and take the cash" is exactly the arrangement an owner
+/// puts a till in to avoid.
+///
+/// No CHECK constraint backs this on SQLite: Prisma stores enums as TEXT and
+/// the client validates. Adding a value here is a type-level change with no
+/// data migration, which is why WAITER arrived without one.
+enum StaffRole {
+  OWNER
+  MANAGER
+  CASHIER
+  WAITER
+  KITCHEN
+}
+
+enum OrderType {
+  DINE_IN
+  TAKEAWAY
+}
+
+/// Commercial lifecycle only. Kitchen progress lives on Kot; settlement
+/// progress is derived from Payment rows.
+enum OrderStatus {
+  DRAFT // items exist, nothing sent to the kitchen yet
+  OPEN // at least one KOT dispatched
+  BILLED // an ACTIVE invoice exists, money still due
+  PAID // settled
+  VOID // cancelled
+}
+
+enum DiscountType {
+  NONE
+  PERCENT // discountValue is basis points
+  FIXED // discountValue is paisa
+}
+
+/// Per dispatch ticket, not per item. See Phase 3 decision D-6.
+enum KotStatus {
+  NEW
+  PREPARING
+  READY
+  SERVED
+  VOID // ticket sent in error; quantity returns to undispatched
+}
+
+enum InvoiceType {
+  STANDARD
+  ABBREVIATED // requires authorisation + amount ceiling; never chosen automatically
+}
+
+enum InvoiceStatus {
+  ACTIVE
+  VOID
+}
+
+enum PaymentMethod {
+  CASH
+  QR
+  CARD
+  CREDIT
+}
+
+/// Cash that enters or leaves the drawer without a sale behind it.
+enum CashMovementType {
+  PAY_IN // change float top-up, owner putting cash in
+  PAY_OUT // petty cash: gas, vegetables, a delivery tip
+}
+
+// ---------------------------------------------------------------------------
+// Restaurant, settings, counters
+// ---------------------------------------------------------------------------
+
+/// Lifecycle of a tenant on the hosted platform. Only TRIAL and ACTIVE tenants
+/// can sign in; the check runs on every authenticated request, so suspending a
+/// restaurant cuts off its open sessions immediately.
+enum TenantStatus {
+  TRIAL
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+}
+
+/// One restaurant is one tenant. Every restaurant-owned row carries its id, and
+/// the server derives that id from the authenticated session - never from a
+/// value the client sends.
+model Restaurant {
+  id        String   @id @default(cuid())
+  /// Workspace code typed at sign-in and used in public links. Lower-case,
+  /// unique across the platform.
+  slug      String   @unique @default(cuid())
+  name      String
+  address   String
+  phone     String
+  panNumber String
+  logoPath  String?
+  contactEmail String?
+  isActive  Boolean  @default(true)
+  status    TenantStatus @default(TRIAL)
+  plan      String   @default("STARTER")
+  /// Null means no expiry (an active paid or internally managed tenant).
+  subscriptionEndsAt DateTime?
+  statusReason String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  auditLogs AuditLog[]
+
+  settings      RestaurantSettings?
+  counters      RestaurantCounter[]
+  staff         Staff[]
+  areas         RestaurantArea[]
+  tables        RestaurantTable[]
+  categories    MenuCategory[]
+  menuItems     MenuItem[]
+  orders        Order[]
+  kots          Kot[]
+  invoices      Invoice[]
+  payments      Payment[]
+  sessions      Session[]
+  shifts        Shift[]
+  cashMovements CashMovement[]
+  tableTransfers OrderTableTransfer[]
+  customers Customer[]
+  creditRepayments CreditRepayment[]
+  refunds PaymentRefund[]
+  expenses Expense[]
+  ingredients Ingredient[]
+  stockMovements StockMovement[]
+  availabilityChanges MenuAvailabilityChange[]
+  recipeChanges RecipeChange[]
+  offers Offer[]
+  payrollProfiles PayrollProfile[]
+  payrollRecords PayrollRecord[]
+  payrollPayments PayrollPayment[]
+  payrollAudits PayrollAudit[]
+  loyaltyEntries LoyaltyEntry[]
+}
+
+model RestaurantSettings {
+  restaurantId String     @id
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  currencyCode String @default("NPR")
+
+  /// OFF by default. A rate having a sensible value is not a reason to charge
+  /// it: enabling VAT makes the software print "VAT 13%" on a tax invoice,
+  /// which asserts this restaurant is VAT-registered. Only the owner can make
+  /// that claim, so it is switched on deliberately in Settings.
+  vatEnabled Boolean @default(false)
+  vatRateBp  Int     @default(1300)
+
+  /// OFF by default for the same reason: this is real money added to a real
+  /// customer's bill.
+  serviceChargeEnabled           Boolean @default(false)
+  serviceChargeRateBp            Int     @default(1000)
+  serviceChargeAppliesToTakeaway Boolean @default(false)
+  roundGrandTotalToRupee         Boolean @default(true)
+
+  /// Abbreviated tax invoices require authorisation from the tax office, so
+  /// this defaults to false and must be turned on deliberately.
+  abbreviatedInvoiceAuthorized   Boolean     @default(false)
+  /// Rs 10,000 ceiling. Configurable because a statutory figure can change.
+  abbreviatedInvoiceCeilingPaisa Int         @default(1000000)
+  defaultInvoiceType             InvoiceType @default(STANDARD)
+  invoicePrefix                  String      @default("INV")
+
+  /// IANA zone. Required, not cosmetic: Nepal is UTC+05:45, so a UTC-based
+  /// "today" would be wrong by nearly six hours for a restaurant closing late.
+  timezone                   String @default("Asia/Kathmandu")
+  /// Minutes after local midnight at which a new business day starts, so
+  /// post-midnight sales land in the correct day. 240 = 04:00.
+  businessDayStartsAtMinutes Int    @default(240)
+
+  /// Highlight NEW tickets still unacknowledged after this many minutes.
+  kitchenNewTicketAlertMinutes Int @default(5)
+
+  /// Customer-facing read-only menu. Disabled until enabled in Settings.
+  customerMenuEnabled Boolean @default(false)
+  loyaltyEnabled Boolean @default(false)
+  loyaltyEarnEveryPaisa Int @default(10000)
+  loyaltyPointValuePaisa Int @default(100)
+  loyaltyVersion Int @default(0)
+
+  printPanOnBill   Boolean @default(true)
+  showBsDateOnBill Boolean @default(true)
+  printQrOnBill    Boolean @default(true)
+  billFooterText   String?
+
+  /// Who last changed settings. Money-affecting configuration (VAT, service
+  /// charge, rounding) should not be anonymous. Nullable because the row
+  /// created by bootstrap predates any edit.
+  updatedByStaffId String?
+  updatedByStaff   Staff?  @relation("SettingsUpdatedBy", fields: [updatedByStaffId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Human-readable number sequences, allocated inside the same transaction that
+/// creates the numbered record. SQLite serialises writers, so this is race-free
+/// without extra machinery.
+///
+/// Names in use:
+///   ORDER
+///   KOT
+///   INVOICE:STANDARD:<fiscalYearStartBsYear>      e.g. INVOICE:STANDARD:2082
+///   INVOICE:ABBREVIATED:<fiscalYearStartBsYear>
+model RestaurantCounter {
+  restaurantId String
+  name         String
+  nextValue    Int    @default(1)
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@id([restaurantId, name])
+}
+
+// ---------------------------------------------------------------------------
+// Staff
+// ---------------------------------------------------------------------------
+
+model Staff {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
+
+  name         String
+  username     String
+  /// scrypt from node:crypto - deliberately not bcrypt/argon2, which are native
+  /// addons and would reintroduce the Electron ABI problem solved in Phase 2.
+  passwordHash String
+  role         StaffRole
+  /// Extra service duties in addition to the role preset.
+  canTakeOrders    Boolean @default(false)
+  canManageKitchen Boolean @default(false)
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Audit back-relations. Staff are never deleted, so every reference resolves.
+  ordersOpened      Order[]                 @relation("OrderOpenedBy")
+  ordersVoided      Order[]                 @relation("OrderVoidedBy")
+  discountsApproved Order[]                 @relation("OrderDiscountApprovedBy")
+  itemCancellations OrderItemCancellation[] @relation("CancellationBy")
+  kotsCreated       Kot[]                   @relation("KotCreatedBy")
+  kotsVoided        Kot[]                   @relation("KotVoidedBy")
+  invoicesIssued    Invoice[]               @relation("InvoiceIssuedBy")
+  invoicesVoided    Invoice[]               @relation("InvoiceVoidedBy")
+  invoicePrints     InvoicePrint[]          @relation("InvoicePrintedBy")
+  paymentsReceived  Payment[]               @relation("PaymentReceivedBy")
+  paymentsVoided    Payment[]               @relation("PaymentVoidedBy")
+  sessions          Session[]
+  settingsUpdated   RestaurantSettings[]    @relation("SettingsUpdatedBy")
+  shiftsOpened      Shift[]                 @relation("ShiftOpenedBy")
+  shiftsClosed      Shift[]                 @relation("ShiftClosedBy")
+  cashMovements     CashMovement[]          @relation("CashMovementBy")
+  tableTransfers OrderTableTransfer[]
+  creditAssigned Payment[] @relation("CreditAssignedBy")
+  creditRepayments CreditRepayment[] @relation("CreditReceivedBy")
+  creditReversals CreditRepayment[] @relation("CreditReversedBy")
+  refunds PaymentRefund[]
+  expenses Expense[]
+  stockMovements StockMovement[]
+  availabilityChanges MenuAvailabilityChange[]
+  recipeChanges RecipeChange[]
+  offersCreated Offer[] @relation("OfferCreatedBy")
+  offersUpdated Offer[] @relation("OfferUpdatedBy")
+  loyaltyEntries LoyaltyEntry[]
+  payrollProfile PayrollProfile? @relation("PayrollEmployeeProfile")
+  payrollProfilesUpdated PayrollProfile[] @relation("PayrollProfileUpdatedBy")
+  payrollRecords PayrollRecord[] @relation("PayrollEmployee")
+  payrollRecordsCreated PayrollRecord[] @relation("PayrollCreatedBy")
+  payrollRecordsUpdated PayrollRecord[] @relation("PayrollUpdatedBy")
+  payrollRecordsApproved PayrollRecord[] @relation("PayrollApprovedBy")
+  payrollPayments PayrollPayment[] @relation("PayrollPaidBy")
+  payrollAudits PayrollAudit[]
+  auditLogs AuditLog[]
+
+  @@unique([restaurantId, username])
+  @@index([restaurantId, isActive])
+}
+
+/// An authenticated staff session, addressed by an opaque bearer token.
+///
+/// Only the SHA-256 of the token is stored. A leaked backup therefore yields
+/// no usable credentials - the plaintext exists once, in the response to
+/// POST /auth/login, and is never written down anywhere by the server.
+///
+/// Sessions live in SQLite rather than memory so that revocation is durable
+/// and so a restart of the host machine does not silently log out other
+/// terminals once LAN clients exist.
+model Session {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
+
+  staffId String
+  staff   Staff  @relation(fields: [staffId], references: [id], onDelete: Restrict)
+
+  /// SHA-256 hex of the bearer token. Never the token itself.
+  tokenHash String @unique
+
+  createdAt  DateTime @default(now())
+  /// Sliding: extended on activity, so an in-use terminal stays logged in and
+  /// an abandoned one expires.
+  expiresAt  DateTime
+  lastSeenAt DateTime @default(now())
+
+  revokedAt     DateTime?
+  revokedReason String?
+
+  /// Free-text hint about which terminal this is, for the sessions list.
+  deviceLabel String?
+  ipAddress   String?
+  userAgent   String?
+
+  @@index([staffId])
+  @@index([restaurantId, expiresAt])
+}
+
+// ---------------------------------------------------------------------------
+// Floor plan
+// ---------------------------------------------------------------------------
+
+model RestaurantArea {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
+
+  name      String
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tables RestaurantTable[]
+
+  @@unique([restaurantId, name])
+  @@index([restaurantId, sortOrder])
+}
+
+/// Deliberately has NO status column. Occupancy is derived from active orders,
+/// so it cannot drift out of sync with reality.
+model RestaurantTable {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
+
+  areaId String
+  area   RestaurantArea @relation(fields: [areaId], references: [id], onDelete: Restrict)
+
+  name      String
+  capacity  Int     @default(4)
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders Order[]
+  transfersFrom OrderTableTransfer[] @relation("TransferFrom")
+  transfersTo OrderTableTransfer[] @relation("TransferTo")
+
+  @@unique([restaurantId, name])
+  @@index([restaurantId, areaId, sortOrder])
+}
+
+// ---------------------------------------------------------------------------
+// Menu
+// ---------------------------------------------------------------------------
+
+model MenuCategory {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
+
+  name      String
+  nameNp    String?
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items MenuItem[]
+
+  @@unique([restaurantId, name])
+  @@index([restaurantId, sortOrder])
+}
+
+model MenuItem {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
+
+  categoryId String
+  category   MenuCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  name       String
+  nameNp     String?
+  pricePaisa Int
+  /// Validated fixed bundle definition; empty for ordinary dishes.
+  comboComponents String @default("[]")
+
+  /// Sold out today. Toggled constantly; the item stays on the menu.
+  isAvailable Boolean @default(true)
+  /// Catalogue membership. Retired items keep isActive=false so historical
+  /// OrderItems still resolve. V1 has no variants: half/full plate are
+  /// separate MenuItems.
+  isActive    Boolean @default(true)
+  sortOrder   Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orderItems OrderItem[]
+  recipeVersion Int @default(0)
+  recipe RecipeIngredient[]
+  availabilityChanges MenuAvailabilityChange[]
+  recipeChanges RecipeChange[]
+
+  @@index([restaurantId, categoryId, sortOrder])
+  @@index([restaurantId, isActive])
+}
+
+// ---------------------------------------------------------------------------
+// Orders
+// ---------------------------------------------------------------------------
+
+model Order {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
+
+  orderNumber Int
+  type        OrderType
+  status      OrderStatus @default(DRAFT)
+
+  tableId       String?
+  table         RestaurantTable? @relation(fields: [tableId], references: [id], onDelete: Restrict)
+  /// Takeaway pickup name/phone.
+  customerLabel String?
+  loyaltyCustomerId String?
+  loyaltyCustomer Customer? @relation(fields: [loyaltyCustomerId], references: [id], onDelete: Restrict)
+  loyaltyPointsToRedeem Int @default(0)
+  loyaltyPointValuePaisa Int @default(0)
+
+  openedByStaffId String
+  openedByStaff   Staff  @relation("OrderOpenedBy", fields: [openedByStaffId], references: [id], onDelete: Restrict)
+
+  /// Local calendar day the order was OPENED, "YYYY-MM-DD". Revenue reporting
+  /// uses Invoice.businessDate instead; this answers "orders opened today".
+  businessDate String
+
+  /// Optimistic concurrency. Bumped by every mutating service operation.
+  version Int @default(0)
+
+  // Working discount, mutable while DRAFT/OPEN. The issued values are frozen
+  // separately on Invoice; these two can legitimately differ after a reissue.
+  discountType              DiscountType @default(NONE)
+  discountValue             Int          @default(0)
+  discountApprovedByStaffId String?
+  discountApprovedByStaff   Staff?       @relation("OrderDiscountApprovedBy", fields: [discountApprovedByStaffId], references: [id], onDelete: Restrict)
+
+  /// Set when the order leaves the floor, i.e. reaches PAID or VOID; `status`
+  /// records which. Carries no information `status` lacks, but makes the
+  /// active-order partial index expressible (see @@unique below) and is the
+  /// single column the floor plan filters on.
+  /// INVARIANT: closedAt IS NULL  <=>  status IN (DRAFT, OPEN, BILLED)
+  closedAt DateTime?
+
+  voidReason      String?
+  voidedByStaffId String?
+  voidedByStaff   Staff?  @relation("OrderVoidedBy", fields: [voidedByStaffId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items    OrderItem[]
+  kots     Kot[]
+  invoices Invoice[]
+  payments Payment[]
+  tableTransfers OrderTableTransfer[]
+
+  @@unique([restaurantId, orderNumber])
+  /// At most one active order per table. TAKEAWAY orders (tableId IS NULL) are
+  /// explicitly excluded, so any number may run concurrently.
+  /// Emits: CREATE UNIQUE INDEX ... ON "Order"("restaurantId","tableId")
+  ///        WHERE "closedAt" IS NULL AND "tableId" IS NOT NULL
+  @@unique([restaurantId, tableId], where: { closedAt: null, tableId: { not: null } }, map: "uq_order_active_per_table")
+  @@index([restaurantId, status])
+  @@index([restaurantId, businessDate])
+}
+
+model OrderItem {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  menuItemId String
+  /// Restrict, deliberately: a MenuItem that has ever been ordered can never be
+  /// hard-deleted. Retire it with isActive=false instead.
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
+
+  // Immutable snapshots. A later rename or price change must never rewrite history.
+  nameSnapshot   String
+  nameNpSnapshot String?
+  unitPricePaisa Int
+  /// Frozen component IDs, names and quantities per bundle.
+  comboSnapshot String @default("[]")
+  promotionSnapshot String?
+
+  /// Total ordered. May never be reduced below the dispatched quantity;
+  /// use OrderItemCancellation beyond that point.
+  quantity Int
+  note     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cancellations OrderItemCancellation[]
+  kotItems      KotItem[]
+  invoiceLines  InvoiceLine[]
+
+  @@index([orderId])
+  @@index([menuItemId])
+}
+
+/// One row per cancellation event, so partial cancellations keep their own
+/// reason, staff and timestamp. cancelledQuantity is the SUM of these rows and
+/// is deliberately not stored.
+model OrderItemCancellation {
+  id          String    @id @default(cuid())
+  orderItemId String
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+
+  quantity Int
+  reason   String
+
+  cancelledByStaffId String
+  cancelledByStaff   Staff  @relation("CancellationBy", fields: [cancelledByStaffId], references: [id], onDelete: Restrict)
+
+  cancelledAt DateTime @default(now())
+
+  @@index([orderItemId])
+}
+
+// ---------------------------------------------------------------------------
+// Kitchen
+// ---------------------------------------------------------------------------
+
+/// A dispatch batch. One Order may have many; a KOT carries only the quantities
+/// sent in THAT batch, which is what stops re-sending already-cooked items.
+model Kot {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  kotNumber Int
+  status    KotStatus @default(NEW)
+
+  createdByStaffId String
+  createdByStaff   Staff  @relation("KotCreatedBy", fields: [createdByStaffId], references: [id], onDelete: Restrict)
+
+  /// Immutable: this is the kitchen timer's origin and the late-ticket
+  /// threshold. Do not reset it on status transitions.
+  createdAt DateTime  @default(now())
+  startedAt DateTime?
+  readyAt   DateTime?
+  servedAt  DateTime?
+
+  /// VOID means "this ticket was dispatched in error" and returns its
+  /// quantities to undispatched. It is NOT the mechanism for a customer
+  /// cancelling food that genuinely went to the kitchen - that is
+  /// OrderItemCancellation.
+  voidedAt        DateTime?
+  voidReason      String?
+  voidedByStaffId String?
+  voidedByStaff   Staff?    @relation("KotVoidedBy", fields: [voidedByStaffId], references: [id], onDelete: Restrict)
+
+  items KotItem[]
+  stockMovements StockMovement[]
+
+  @@unique([restaurantId, kotNumber])
+  @@index([restaurantId, status])
+  @@index([orderId])
+}
+
+model KotItem {
+  id    String @id @default(cuid())
+  kotId String
+  kot   Kot    @relation(fields: [kotId], references: [id], onDelete: Restrict)
+
+  orderItemId String
+  /// Restrict: an OrderItem with any dispatched quantity cannot be deleted.
+  /// This makes the "hard-delete only while dispatched = 0" rule a database
+  /// guarantee rather than a service-layer promise.
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+
+  quantity     Int
+  /// What this ticket told the kitchen. Editing the OrderItem note later must
+  /// not rewrite what was already printed and acted on.
+  noteSnapshot String?
+
+  @@index([kotId])
+  @@index([orderItemId])
+}
+
+// ---------------------------------------------------------------------------
+// Invoicing
+// ---------------------------------------------------------------------------
+
+/// An issued tax invoice. IMMUTABLE after creation: the only permitted change
+/// is ACTIVE -> VOID plus the void fields. Amendment is void-and-reissue, which
+/// burns the old number and allocates a new one.
+///
+/// A PRE-BILL is not an Invoice - it is a live render with no number and no row.
+model Invoice {
+  /// Frozen customer, earning rate and redemption details; no live settings lookup on reprint.
+  loyaltySnapshot String?
+  loyaltyEntries LoyaltyEntry[]
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  invoiceType           InvoiceType   @default(STANDARD)
+  invoiceNumber         Int
+  /// Start year (B.S.) of the Nepali fiscal year this number belongs to.
+  /// 2082 means FY 2082/83, which runs Shrawan 2082 - Ashadh 2083. Stored as
+  /// the single authoritative integer; "2082/83" is a DISPLAY format produced
+  /// at print time, never persisted, so one fiscal year has exactly one
+  /// representation in the database.
+  fiscalYearStartBsYear Int
+  status                InvoiceStatus @default(ACTIVE)
+
+  issuedAt        DateTime @default(now())
+  issuedByStaffId String
+  issuedByStaff   Staff    @relation("InvoiceIssuedBy", fields: [issuedByStaffId], references: [id], onDelete: Restrict)
+  /// Local calendar day of issue, "YYYY-MM-DD". Revenue reporting groups on this.
+  businessDate    String
+
+  buyerName    String?
+  buyerPan     String?
+  buyerAddress String?
+
+  /// SELLER identity, frozen at issue. Without these a reprint would show the
+  /// restaurant's CURRENT name and PAN, so correcting a typo would silently
+  /// rewrite what every past document says about who issued it. Nullable
+  /// because invoices issued before Phase 4H have no snapshot to show.
+  sellerName    String?
+  sellerAddress String?
+  sellerPan     String?
+
+  // Frozen money. Never recomputed.
+  subtotalPaisa           Int
+  discountType            DiscountType @default(NONE)
+  discountValue           Int          @default(0)
+  discountPaisa           Int          @default(0)
+  serviceChargeRateBp     Int          @default(0)
+  serviceChargePaisa      Int          @default(0)
+  vatRateBp               Int          @default(0)
+  vatPaisa                Int          @default(0)
+  roundingAdjustmentPaisa Int          @default(0)
+  grandTotalPaisa         Int
+
+  voidedAt        DateTime?
+  voidReason      String?
+  voidedByStaffId String?
+  voidedByStaff   Staff?    @relation("InvoiceVoidedBy", fields: [voidedByStaffId], references: [id], onDelete: Restrict)
+
+  // CBMS integration metadata. Present so the field shape is settled; no sync
+  // is implemented in V1.
+  cbmsSyncedAt    DateTime?
+  cbmsReference   String?
+  cbmsPayloadHash String?
+
+  lines    InvoiceLine[]
+  prints   InvoicePrint[]
+  payments Payment[]
+
+  @@unique([restaurantId, invoiceType, fiscalYearStartBsYear, invoiceNumber])
+  /// At most one ACTIVE invoice per order; any number of VOID ones may remain.
+  /// Emits: CREATE UNIQUE INDEX ... ON "Invoice"("orderId") WHERE "status" = 'ACTIVE'
+  @@unique([orderId], where: { status: "ACTIVE" }, map: "uq_invoice_active_per_order")
+  @@index([restaurantId, businessDate])
+  @@index([restaurantId, status])
+  @@index([orderId])
+}
+
+/// The lines exactly as issued. Snapshotted rather than joined, so a voided
+/// invoice still reprints the document that was actually given to the customer,
+/// even after the order was amended and reissued.
+model InvoiceLine {
+  id        String  @id @default(cuid())
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+
+  lineNumber Int
+
+  /// Provenance only, and nullable on purpose. The snapshot columns below are
+  /// authoritative; a required FK here would let order edits corrupt an issued
+  /// document.
+  orderItemId String?
+  orderItem   OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+
+  description    String
+  descriptionNp  String?
+  promotionSnapshot String?
+  quantity       Int
+  unitPricePaisa Int
+  lineTotalPaisa Int
+
+  paymentAllocations PaymentItemAllocation[]
+
+  @@unique([invoiceId, lineNumber])
+  @@index([invoiceId])
+}
+
+/// A print record produced by Nayaro RMS.
+///
+/// This records that the application generated and dispatched a print for this
+/// invoice - it is NOT evidence that paper physically emerged from a thermal
+/// printer. Hardware failure, an offline printer or an empty roll all leave a
+/// row here with nothing in the customer's hand.
+///
+/// printCount is COUNT(*) over these rows; copySequence 1 is the original and
+/// 2+ must be rendered with a "copy of original" mark showing the copy number.
+model InvoicePrint {
+  id        String  @id @default(cuid())
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+
+  copySequence Int
+
+  printedByStaffId String
+  printedByStaff   Staff    @relation("InvoicePrintedBy", fields: [printedByStaffId], references: [id], onDelete: Restrict)
+  printedAt        DateTime @default(now())
+
+  @@unique([invoiceId, copySequence])
+  @@index([invoiceId])
+}
+
+// ---------------------------------------------------------------------------
+// Payments
+// ---------------------------------------------------------------------------
+
+model Payment {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  /// Non-null: the Pay workflow always issues an invoice before recording
+  /// money, so every payment is tied to the document it settled. Safe because
+  /// an invoice carrying payments can never be voided.
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+
+  method        PaymentMethod
+  /// Amount applied to the bill. For cash this is NOT what the customer handed
+  /// over - see tenderedPaisa. Change is derived, never stored.
+  amountPaisa   Int
+  tenderedPaisa Int?
+
+  /// QR / card transaction identifier.
+  reference         String?
+  /// Frozen display name at sale. Older payments may have no customer link;
+  /// those are assigned explicitly without changing this historical snapshot.
+  creditAccountName String?
+  customerId String?
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  creditAssignedAt DateTime?
+  creditAssignedByStaffId String?
+  creditAssignedByStaff Staff? @relation("CreditAssignedBy", fields: [creditAssignedByStaffId], references: [id], onDelete: Restrict)
+
+  receivedByStaffId String
+  receivedByStaff   Staff  @relation("PaymentReceivedBy", fields: [receivedByStaffId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  voidedAt        DateTime?
+  voidReason      String?
+  voidedByStaffId String?
+  voidedByStaff   Staff?    @relation("PaymentVoidedBy", fields: [voidedByStaffId], references: [id], onDelete: Restrict)
+
+  itemAllocations PaymentItemAllocation[]
+  refunds PaymentRefund[]
+
+  @@index([orderId])
+  @@index([invoiceId])
+  @@index([restaurantId, customerId])
+  @@index([restaurantId, createdAt])
+}
+
+/// Item shares of a payment; reversing the parent releases these quantities.
+model PaymentItemAllocation {
+  paymentId String
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  invoiceLineId String
+  invoiceLine InvoiceLine @relation(fields: [invoiceLineId], references: [id], onDelete: Restrict)
+  quantity Int
+  amountPaisa Int
+
+  @@id([paymentId, invoiceLineId])
+  @@index([invoiceLineId])
+}
+
+/// Permanent return of a settled payment; the sale and table remain closed.
+model PaymentRefund {
+  id String @id @default(cuid())
+  restaurantId String
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
+  paymentId String
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  customerId String?
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  amountPaisa Int
+  method PaymentMethod
+  reason String
+  businessDate String
+  staffId String
+  staff Staff @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  cashMovementId String? @unique
+  cashMovement CashMovement? @relation(fields: [cashMovementId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+
+  @@index([paymentId])
+  @@index([restaurantId, businessDate])
+  @@index([customerId])
+}
+
+// ---------------------------------------------------------------------------
+// Cash drawer
+// ---------------------------------------------------------------------------
+
+/// One drawer session: opened with a float, closed with a count.
+///
+/// The drawer is a TIME WINDOW, not a foreign key on Payment. Cash taken while
+/// a shift is open belongs to it; that is how a cashier thinks about the till,
+/// and it means recording a payment never depends on a shift existing.
+///
+/// `expectedCashPaisa` is frozen at close, alongside the count. Recomputing it
+/// later would let a payment voided tomorrow rewrite tonight's variance.
+///
+/// CHECK constraints (hand-written in the migration):
+///   chk_shift_amounts      - no negative money
+///   chk_shift_closed_state - closing columns are all set or all null
+model Shift {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
+
+  /// Business date at opening. A shift that runs past the rollover still
+  /// belongs to the day it started.
+  businessDate String
+
+  openedByStaffId   String
+  openedByStaff     Staff    @relation("ShiftOpenedBy", fields: [openedByStaffId], references: [id], onDelete: Restrict)
+  openedAt          DateTime @default(now())
+  openingFloatPaisa Int
+
+  closedByStaffId   String?
+  closedByStaff     Staff?    @relation("ShiftClosedBy", fields: [closedByStaffId], references: [id], onDelete: Restrict)
+  closedAt          DateTime?
+  expectedCashPaisa Int?
+  countedCashPaisa  Int?
+  closeNote         String?
+
+  movements CashMovement[]
+
+  @@unique([restaurantId], where: { closedAt: null }, map: "uq_shift_open_per_restaurant")
+  @@index([restaurantId, openedAt])
+  @@index([restaurantId, businessDate])
+}
+
+/// Pay-in / pay-out. Never edited or deleted: a mistake is corrected by an
+/// opposite movement with its own reason, the same way the rest of the ledger
+/// works.
+///
+/// CHECK constraint: chk_cash_movement_amount - amount is positive.
+model CashMovement {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
+
+  shiftId String
+  shift   Shift  @relation(fields: [shiftId], references: [id], onDelete: Restrict)
+
+  type        CashMovementType
+  amountPaisa Int
+  reason      String
+
+  staffId String
+  staff   Staff  @relation("CashMovementBy", fields: [staffId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  refund PaymentRefund?
+  expense Expense?
+
+  @@index([shiftId])
+  @@index([restaurantId, createdAt])
+}
+
+/// Durable receipts for retried writes. A receipt commits with its domain write.
+/// Scoped to the authenticated restaurant and staff, never supplied in the body.
+model RequestReceipt {
+  restaurantId String
+  staffId String
+  key String
+  requestHash String
+  responseJson String?
+  createdAt DateTime @default(now())
+
+  @@id([restaurantId, staffId, key])
+}
+
+model Expense {
+  id String @id @default(cuid())
+  restaurantId String
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
+  staffId String
+  staff Staff @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  amountPaisa Int
+  method PaymentMethod
+  category String
+  supplier String?
+  note String
+  businessDate String
+  receiptName String?
+  receiptMime String?
+  receiptBase64 String?
+  cashMovementId String? @unique
+  cashMovement CashMovement? @relation(fields: [cashMovementId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+  stockMovement StockMovement?
+  payrollPayment PayrollPayment?
+
+  @@index([restaurantId, businessDate])
+}
+
+model Ingredient {
+  id String @id @default(cuid())
+  restaurantId String
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
+  name String
+  unit String
+  onHandMilli Int @default(0)
+  lowStockMilli Int @default(0)
+  version Int @default(0)
+  isActive Boolean @default(true)
+  recipe RecipeIngredient[]
+  movements StockMovement[]
+  @@unique([restaurantId, name])
+}
+
+model RecipeIngredient {
+  menuItemId String
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
+  ingredientId String
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+  quantityMilli Int
+  @@id([menuItemId, ingredientId])
+}
+
+model StockMovement {
+  id String @id @default(cuid())
+  restaurantId String
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
+  ingredientId String
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+  staffId String
+  staff Staff @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  kind String
+  deltaMilli Int
+  balanceAfterMilli Int
+  reason String
+  supplier String?
+  costPaisa Int?
+  businessDate String
+  expenseId String? @unique
+  expense Expense? @relation(fields: [expenseId], references: [id], onDelete: Restrict)
+  kotId String?
+  kot Kot? @relation(fields: [kotId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+  @@unique([kotId, ingredientId])
+  @@index([restaurantId, ingredientId, createdAt])
+}
+
+model MenuAvailabilityChange {
+  id String @id @default(cuid())
+  restaurantId String
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
+  menuItemId String
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
+  staffId String
+  staff Staff @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  isAvailable Boolean
+  reason String
+  createdAt DateTime @default(now())
+  @@index([restaurantId, createdAt])
+}
+
+model RecipeChange {
+  id String @id @default(cuid())
+  restaurantId String
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
+  menuItemId String
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
+  staffId String
+  staff Staff @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  reason String
+  beforeJson String
+  afterJson String
+  createdAt DateTime @default(now())
+  @@index([restaurantId, createdAt])
+}
+
+/// Balances are derived from credit payments less repayments, never stored.
+model Customer {
+  id String @id @default(cuid())
+  restaurantId String
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
+  name String
+  phone String?
+  address String?
+  isActive Boolean @default(true)
+  version Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  payments Payment[]
+  loyaltyOrders Order[]
+  loyaltyEntries LoyaltyEntry[]
+  repayments CreditRepayment[]
+  refunds PaymentRefund[]
+
+  @@index([restaurantId, name])
+}
+
+/// Collections of an existing receivable: never another sale or invoice payment.
+model CreditRepayment {
+  id String @id @default(cuid())
+  restaurantId String
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
+  customerId String
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  amountPaisa Int
+  method PaymentMethod
+  reference String?
+  note String?
+  businessDate String
+  receivedByStaffId String
+  receivedByStaff Staff @relation("CreditReceivedBy", fields: [receivedByStaffId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+  reversedAt DateTime?
+  reversalBusinessDate String?
+  reversalReason String?
+  reversedByStaffId String?
+  reversedByStaff Staff? @relation("CreditReversedBy", fields: [reversedByStaffId], references: [id], onDelete: Restrict)
+
+  @@index([restaurantId, customerId])
+  @@index([restaurantId, businessDate])
+  @@index([restaurantId, createdAt])
+}
+
+/// Transfers are kept even if an empty, undispatched draft is later removed.
+/// Names and order number are snapshots so that history survives renaming.
+model OrderTableTransfer {
+  id String @id @default(cuid())
+  restaurantId String
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
+  orderId String?
+  order Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  orderNumber Int
+  fromTableId String
+  fromTable RestaurantTable @relation("TransferFrom", fields: [fromTableId], references: [id], onDelete: Restrict)
+  toTableId String
+  toTable RestaurantTable @relation("TransferTo", fields: [toTableId], references: [id], onDelete: Restrict)
+  fromTableName String
+  toTableName String
+  staffId String
+  staff Staff @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+
+  @@index([restaurantId, createdAt])
+  @@index([orderId])
+}
+
+/// Scheduled percentage reductions. Definitions never rewrite already ordered prices.
+model Offer {
+  id String @id @default(cuid())
+  restaurantId String
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
+  name String
+  rateBp Int
+  scope String
+  targetIdsJson String
+  startsAt DateTime
+  endsAt DateTime
+  isActive Boolean @default(true)
+  version Int @default(0)
+  createdByStaffId String
+  createdByStaff Staff @relation("OfferCreatedBy", fields: [createdByStaffId], references: [id], onDelete: Restrict)
+  updatedByStaffId String
+  updatedByStaff Staff @relation("OfferUpdatedBy", fields: [updatedByStaffId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([restaurantId, isActive, startsAt, endsAt])
+}
+
+/// Immutable point movements. Refunds can make a balance negative after points were spent.
+model LoyaltyEntry {
+  id String @id @default(cuid())
+  restaurantId String
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
+  customerId String
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  invoiceId String
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  staffId String
+  staff Staff @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  key String @unique
+  kind String
+  reason String?
+  deltaPoints Int
+  createdAt DateTime @default(now())
+
+  @@index([restaurantId, customerId, createdAt])
+  @@index([invoiceId])
+}
+
+model PayrollProfile {
+  staffId String @id
+  staff Staff @relation("PayrollEmployeeProfile", fields: [staffId], references: [id], onDelete: Restrict)
+  restaurantId String
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
+  monthlySalaryPaisa Int
+  version Int @default(0)
+  updatedByStaffId String
+  updatedByStaff Staff @relation("PayrollProfileUpdatedBy", fields: [updatedByStaffId], references: [id], onDelete: Restrict)
+  updatedAt DateTime @updatedAt
+
+  @@index([restaurantId])
+}
+
+/// One monthly statement per staff member. Payment rows are never edited or deleted.
+model PayrollRecord {
+  id String @id @default(cuid())
+  restaurantId String
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
+  staffId String
+  staff Staff @relation("PayrollEmployee", fields: [staffId], references: [id], onDelete: Restrict)
+  staffNameSnapshot String
+  month String
+  baseSalaryPaisa Int
+  allowancesPaisa Int @default(0)
+  deductionsPaisa Int @default(0)
+  note String @default("")
+  status String @default("DRAFT")
+  version Int @default(0)
+  createdByStaffId String
+  createdByStaff Staff @relation("PayrollCreatedBy", fields: [createdByStaffId], references: [id], onDelete: Restrict)
+  updatedByStaffId String
+  updatedByStaff Staff @relation("PayrollUpdatedBy", fields: [updatedByStaffId], references: [id], onDelete: Restrict)
+  approvedByStaffId String?
+  approvedByStaff Staff? @relation("PayrollApprovedBy", fields: [approvedByStaffId], references: [id], onDelete: Restrict)
+  approvedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  payments PayrollPayment[]
+  audits PayrollAudit[]
+
+  @@unique([restaurantId, staffId, month])
+  @@index([restaurantId, month])
+}
+
+model PayrollPayment {
+  id String @id @default(cuid())
+  restaurantId String
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
+  payrollRecordId String
+  payrollRecord PayrollRecord @relation(fields: [payrollRecordId], references: [id], onDelete: Restrict)
+  paidByStaffId String
+  paidByStaff Staff @relation("PayrollPaidBy", fields: [paidByStaffId], references: [id], onDelete: Restrict)
+  kind String
+  amountPaisa Int
+  method String
+  reference String?
+  note String
+  businessDate String
+  expenseId String @unique
+  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+
+  @@index([payrollRecordId, createdAt])
+}
+
+model PayrollAudit {
+  id String @id @default(cuid())
+  restaurantId String
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
+  payrollRecordId String
+  payrollRecord PayrollRecord @relation(fields: [payrollRecordId], references: [id], onDelete: Restrict)
+  staffId String
+  staff Staff @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  kind String
+  beforeJson String?
+  afterJson String
+  note String
+  createdAt DateTime @default(now())
+
+  @@index([payrollRecordId, createdAt])
+}
+
+/// Security-relevant events per tenant: sign-ins, account and settings changes,
+/// voids and refunds. Append-only; nothing updates or deletes these rows.
+model AuditLog {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Restrict)
+  staffId      String?
+  staff        Staff?     @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  action       String
+  entityType   String?
+  entityId     String?
+  summary      String
+  /// JSON object with non-sensitive detail. Never passwords or tokens.
+  metadata     String?
+  ipAddress    String?
+  createdAt    DateTime   @default(now())
+
+  @@index([restaurantId, createdAt])
+  @@index([restaurantId, action])
+}

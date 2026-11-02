@@ -1,0 +1,42 @@
+{
+  "name": "nayaro-web-rms",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Nayaro RMS Cloud - multi-tenant web restaurant management platform by Nayaro Technology.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "workspaces": [
+    "apps/web",
+    "packages/shared",
+    "packages/database",
+    "packages/server"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,green \"npm run dev --workspace @nayaro/server\" \"npm run dev --workspace @nayaro/web\"",
+    "dev:api": "npm run dev --workspace @nayaro/server",
+    "dev:web": "npm run dev --workspace @nayaro/web",
+    "build": "npm run build --workspace @nayaro/web",
+    "start": "npm run start --workspace @nayaro/server",
+    "db:migrate": "npm run db:migrate --workspace @nayaro/server",
+    "demo:seed": "npm run demo:seed --workspace @nayaro/server",
+    "tenant": "npm run tenant --workspace @nayaro/server",
+    "test": "npm run test --workspace @nayaro/server",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "test:all": "npm run test:all --workspace @nayaro/server"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "concurrently": "9.2.1",
+    "eslint": "10.9.1",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.11.0",
+    "prettier": "3.9.6",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.68.0"
+  }
+}

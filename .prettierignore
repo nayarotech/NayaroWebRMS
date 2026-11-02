@@ -1,0 +1,8 @@
+node_modules
+out
+dist
+.vite
+package-lock.json
+apps/mobile/.tooling
+apps/mobile/android/.gradle
+apps/mobile/android/**/build

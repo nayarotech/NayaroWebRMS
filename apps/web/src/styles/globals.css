@@ -1,0 +1,382 @@
+@import '@fontsource-variable/manrope';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/600.css';
+@import 'tailwindcss';
+
+/* `dark:` follows the app's theme toggle, not the OS setting. */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/*
+ * Nayaro RMS design tokens, ported from the approved prototype.
+ *
+ * Every colour in the application comes from here. No component hard-codes a
+ * hex value - that is what makes a theme switch a change in one file rather
+ * than a search-and-replace across the codebase.
+ *
+ * Two constants survive both themes, because they are the brand:
+ *   --ny-accent  #1F5EFF   the blue
+ *   --ny-navy    #0E1420   the ink
+ * The sidebar (--ny-sidebar) is a pale panel in light mode and drops to the
+ * navy in dark mode.
+ */
+
+@theme {
+  --font-sans:
+    'Manrope Variable', 'Manrope', 'Noto Sans Devanagari', system-ui, -apple-system, 'Segoe UI',
+    sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+
+  /* Type scale. Pages use these names, never ad-hoc pixel sizes. */
+  --text-display: 1.75rem;
+  --text-display--line-height: 2.25rem;
+  --text-title: 1.375rem;
+  --text-title--line-height: 1.875rem;
+  --text-heading: 1.0625rem;
+  --text-heading--line-height: 1.5rem;
+  --text-body: 0.875rem;
+  --text-body--line-height: 1.375rem;
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1.125rem;
+  --text-overline: 0.6875rem;
+  --text-overline--line-height: 1rem;
+
+  /* Radius scale: controls, cards, panels, sheets. */
+  --radius-control: 0.625rem;
+  --radius-card: 0.875rem;
+  --radius-panel: 1.125rem;
+
+  /* Layout. Every page uses the same content width and gutters. */
+  --container-page: 1440px;
+  --spacing-sidebar: 248px;
+  --spacing-sidebar-collapsed: 76px;
+  --spacing-topbar: 64px;
+}
+
+:root {
+  color-scheme: light;
+
+  /* surfaces */
+  --ny-base: #f4f6fb;
+  --ny-surface: #ffffff;
+  --ny-surface-2: #f9fafd;
+  --ny-surface-3: #f6f8fc;
+  --ny-neutral-tint: #eef2f8;
+  --ny-field: #ffffff;
+  --ny-header-bg: rgb(255 255 255 / 92%);
+
+  /* borders */
+  --ny-border: #e7ebf2;
+  --ny-border-2: #dfe4ed;
+  --ny-border-3: #d2d9e5;
+  --ny-border-4: #c3cbda;
+
+  /* text */
+  --ny-text: #0b1220;
+  --ny-text-2: #1e2637;
+  --ny-text-3: #2b3346;
+  --ny-muted: #5a6478;
+  --ny-muted-2: #6b7488;
+  --ny-muted-3: #7c8496;
+  --ny-placeholder: #9aa2b4;
+
+  /*
+   * Brand. The blue and the navy are Nayaro's identity and survive both
+   * themes.
+   */
+  --ny-accent: #1f5eff;
+  --ny-accent-hover: #1a4fd8;
+  --ny-accent-soft: rgb(31 94 255 / 9%);
+  --ny-navy: #0e1420;
+  --ny-navy-2: #151d2e;
+  --ny-sidebar: #f7f8fa;
+  --ny-red: #dc2626;
+  --ny-red-fg: #b42318;
+  --ny-amber: #d97706;
+  --ny-amber-fg: #92400e;
+  --ny-green: #16a34a;
+  --ny-green-fg: #15803d;
+
+  /*
+   * Table status - semantic, not decorative. States that require ACTION are
+   * loud, states that require nothing are quiet.
+   */
+  --ny-status-available: #64748b;
+  --ny-status-occupied: #1f5eff;
+  --ny-status-preparing: #d97706;
+  --ny-status-ready: #16a34a;
+  --ny-status-payment: #dc2626;
+
+  --ny-shadow-1: rgb(16 24 40 / 5%);
+  --ny-shadow-2: rgb(16 24 40 / 10%);
+  --ny-overlay: rgb(16 24 40 / 45%);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --ny-base: #0a0e17;
+  --ny-surface: #111726;
+  --ny-surface-2: #0e1420;
+  --ny-surface-3: #0d1320;
+  --ny-neutral-tint: #1a2233;
+  --ny-field: #0b1120;
+  --ny-header-bg: rgb(13 19 32 / 92%);
+
+  --ny-border: #1e2739;
+  --ny-border-2: #232d42;
+  --ny-border-3: #2a3550;
+  --ny-border-4: #2f3b57;
+
+  --ny-text: #f7f9fc;
+  --ny-text-2: #dce3ef;
+  --ny-text-3: #c9d2e3;
+  --ny-muted: #98a2b8;
+  --ny-muted-2: #8a94aa;
+  --ny-muted-3: #78839b;
+  --ny-placeholder: #5e687e;
+
+  --ny-accent: #1f5eff;
+  --ny-accent-hover: #4a7cff;
+  --ny-accent-soft: rgb(74 124 255 / 14%);
+  --ny-navy: #0b101b;
+  --ny-navy-2: #121a2a;
+  --ny-sidebar: #0e1420;
+  --ny-red: #ef4444;
+  --ny-red-fg: #fca5a5;
+  --ny-amber: #f59e0b;
+  --ny-amber-fg: #fcd34d;
+  --ny-green: #22c55e;
+  --ny-green-fg: #6ee7a8;
+
+  --ny-status-available: #94a3b8;
+  --ny-status-occupied: #4a7cff;
+  --ny-status-preparing: #f59e0b;
+  --ny-status-ready: #22c55e;
+  --ny-status-payment: #f87171;
+
+  --ny-shadow-1: rgb(0 0 0 / 35%);
+  --ny-shadow-2: rgb(0 0 0 / 45%);
+  --ny-overlay: rgb(3 5 10 / 72%);
+}
+
+/* Expose the tokens to Tailwind: bg-surface, text-muted, border-border, ... */
+@theme inline {
+  --color-base: var(--ny-base);
+  --color-surface: var(--ny-surface);
+  --color-surface-2: var(--ny-surface-2);
+  --color-surface-3: var(--ny-surface-3);
+  --color-neutral-tint: var(--ny-neutral-tint);
+  --color-field: var(--ny-field);
+
+  --color-border: var(--ny-border);
+  --color-border-2: var(--ny-border-2);
+  --color-border-3: var(--ny-border-3);
+  --color-border-4: var(--ny-border-4);
+
+  --color-text: var(--ny-text);
+  --color-text-2: var(--ny-text-2);
+  --color-text-3: var(--ny-text-3);
+  --color-muted: var(--ny-muted);
+  --color-muted-2: var(--ny-muted-2);
+  --color-muted-3: var(--ny-muted-3);
+
+  --color-accent: var(--ny-accent);
+  --color-accent-hover: var(--ny-accent-hover);
+  --color-accent-soft: var(--ny-accent-soft);
+  --color-navy: var(--ny-navy);
+  --color-navy-2: var(--ny-navy-2);
+  --color-sidebar: var(--ny-sidebar);
+  --color-danger: var(--ny-red);
+  --color-danger-fg: var(--ny-red-fg);
+  --color-warn: var(--ny-amber);
+  --color-warn-fg: var(--ny-amber-fg);
+  --color-ok: var(--ny-green);
+  --color-ok-fg: var(--ny-green-fg);
+
+  /* bg-status-ready, text-status-payment, border-status-preparing/40, ... */
+  --color-status-available: var(--ny-status-available);
+  --color-status-occupied: var(--ny-status-occupied);
+  --color-status-preparing: var(--ny-status-preparing);
+  --color-status-ready: var(--ny-status-ready);
+  --color-status-payment: var(--ny-status-payment);
+
+  --shadow-card: 0 1px 2px var(--ny-shadow-1), 0 1px 3px var(--ny-shadow-1);
+  --shadow-raised: 0 4px 12px var(--ny-shadow-1), 0 1px 3px var(--ny-shadow-1);
+  --shadow-overlay: 0 24px 64px var(--ny-shadow-2);
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--ny-base);
+    color: var(--ny-text);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Buttons are tapped all shift long; selecting their labels is never intended. */
+  button {
+    user-select: none;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ny-accent-hover);
+    outline-offset: 2px;
+  }
+
+  ::placeholder {
+    color: var(--ny-placeholder);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--ny-border-4);
+    border: 3px solid transparent;
+    border-radius: 6px;
+    background-clip: content-box;
+  }
+}
+
+@keyframes ny-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@utility animate-rise {
+  animation: ny-rise 0.18s ease;
+}
+
+@keyframes ny-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@utility animate-fade {
+  animation: ny-fade 0.15s ease;
+}
+
+@keyframes ny-slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@utility animate-slide-in {
+  animation: ny-slide-in 0.2s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/*
+ * Printing.
+ *
+ * The app is a fixed shell that scrolls internally, which is the opposite of
+ * what a printer wants. Rather than trying to make the whole UI printable, exactly
+ * one element is: whatever React has portalled into #print-root. On screen it
+ * is hidden; on paper it is the only thing there.
+ *
+ * This avoids the usual hidden-iframe trick, which the Content-Security-Policy
+ * (`frame-src 'none'`) forbids.
+ */
+#print-root {
+  display: none;
+}
+
+@media print {
+  html,
+  body {
+    height: auto;
+    overflow: visible;
+    background: #fff;
+  }
+
+  #root {
+    display: none !important;
+  }
+
+  #print-root {
+    display: block !important;
+  }
+
+  /* Never spend a printer's toner on our dark theme. */
+  #print-root * {
+    color: #000 !important;
+    background: transparent !important;
+  }
+}
+
+/*
+ * Data tables that are not built with <DataTable> (dense ledgers inside
+ * screens) share its look through this one class.
+ */
+@layer components {
+  .ny-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--text-body);
+    text-align: left;
+  }
+  .ny-table thead tr {
+    background: var(--ny-surface-2);
+    border-bottom: 1px solid var(--ny-border);
+  }
+  .ny-table th {
+    padding: 0.625rem 1rem;
+    color: var(--ny-muted);
+    font-size: var(--text-overline);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .ny-table td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--ny-border);
+    vertical-align: middle;
+  }
+  .ny-table tbody tr:last-child td {
+    border-bottom: 0;
+  }
+  .ny-table tbody tr:hover {
+    background: var(--ny-surface-2);
+  }
+  .ny-table-card {
+    overflow-x: auto;
+    border: 1px solid var(--ny-border);
+    border-radius: var(--radius-card);
+    background: var(--ny-surface);
+    box-shadow: var(--shadow-card);
+  }
+}

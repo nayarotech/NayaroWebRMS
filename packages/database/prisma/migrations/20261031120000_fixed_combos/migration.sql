@@ -1,0 +1,2 @@
+ALTER TABLE "MenuItem" ADD COLUMN "comboComponents" TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE "OrderItem" ADD COLUMN "comboSnapshot" TEXT NOT NULL DEFAULT '[]';

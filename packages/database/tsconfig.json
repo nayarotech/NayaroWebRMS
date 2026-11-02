@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": ["node"],
+    // prisma7.config.ts must import ./src/paths.ts with its extension because
+    // Prisma's config loader resolves it literally. Safe here: we never emit.
+    "allowImportingTsExtensions": true
+  },
+  "include": ["src/**/*.ts", "scripts/**/*.ts", "prisma7.config.ts"],
+  "exclude": ["src/generated/**"]
+}
