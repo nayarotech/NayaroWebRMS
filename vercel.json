@@ -4,6 +4,7 @@
     "web": {
       "root": "apps/web",
       "framework": "vite",
+      "installCommand": "cd ../.. && npm ci --include=dev --workspaces --include-workspace-root",
       "buildCommand": "npm run build",
       "outputDirectory": "dist",
       "rewrites": [{ "source": "/((?!@|.*\\.).*)", "destination": "/index.html" }]
@@ -11,6 +12,7 @@
     "server": {
       "root": "packages/server",
       "framework": "express",
+      "installCommand": "cd ../.. && npm ci --include=dev --workspaces --include-workspace-root",
       "entrypoint": "app.ts",
       "devCommand": "node --import tsx app.ts",
       "buildCommand": "npm run db:generate --workspace @nayaro/database && npm run typecheck"

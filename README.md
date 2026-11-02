@@ -163,6 +163,11 @@ the API, including `/api/socket.io`; all other paths reach the frontend. The
 frontend service includes an SPA fallback for deep links such as `/register`
 and `/m/himalayan-kitchen`.
 
+Each service runs `npm ci --include=dev --workspaces --include-workspace-root`
+from the repository root. This includes the root TypeScript
+compiler and workspace build tools even when the build environment sets
+`NODE_ENV=production` or otherwise omits development dependencies by default.
+
 The web app calls the public `/api` path from the browser. There are currently
 **no server-to-server calls and no internal service bindings**. Do not inject an
 internal binding URL into `VITE_API_URL`: Vite embeds that variable at build time,
