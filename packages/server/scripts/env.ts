@@ -29,6 +29,11 @@ function parseTrustProxy(value: string | undefined): boolean | number | string {
 
 export function resolveDatabaseLocation(): string {
   const configured = process.env['DATABASE_URL'];
+  if (process.env['VERCEL'] === '1' && process.env['VERCEL_ENV'] !== 'development') {
+    if (!configured || !/^(?:libsql|https|wss):\/\//i.test(configured)) {
+      throw new Error('Vercel requires DATABASE_URL pointing to a managed libSQL database.');
+    }
+  }
   if (configured) return configured;
   const file = resolve(serverPackageDir, '.data', 'nayaro.db');
   mkdirSync(dirname(file), { recursive: true });
@@ -39,6 +44,14 @@ export function resolveDatabaseLocation(): string {
 export function serverOptionsFromEnvironment(): StartNayaroServerOptions {
   const production = process.env['NODE_ENV'] === 'production';
   const webOrigins = list(process.env['WEB_ORIGINS']);
+  // Preview deployments have their own origin; use Vercel's trusted environment
+  // metadata instead of trusting arbitrary incoming Host headers.
+  if (process.env['VERCEL'] === '1') {
+    for (const name of ['VERCEL_URL', 'VERCEL_PROJECT_PRODUCTION_URL']) {
+      const host = process.env[name];
+      if (host) webOrigins.push(`https://${host}`);
+    }
+  }
   if (webOrigins.length === 0 && !production) webOrigins.push('http://localhost:5180');
   if (production && webOrigins.length === 0) {
     throw new Error('WEB_ORIGINS must list the web application origin(s) in production.');
@@ -51,7 +64,9 @@ export function serverOptionsFromEnvironment(): StartNayaroServerOptions {
     databaseFilePath: resolveDatabaseLocation(),
     ...(authToken ? { databaseAuthToken: authToken } : {}),
     webOrigins,
-    trustProxy: parseTrustProxy(process.env['TRUST_PROXY']),
+    trustProxy: parseTrustProxy(
+      process.env['TRUST_PROXY'] ?? (process.env['VERCEL'] === '1' ? '1' : undefined),
+    ),
     hsts: production,
     ...(process.env['API_RATE_LIMIT_PER_MINUTE']
       ? { apiRequestsPerMinute: Number(process.env['API_RATE_LIMIT_PER_MINUTE']) }

@@ -1,6 +1,7 @@
 import { createServer, type Server as HttpServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { Server as SocketIOServer } from 'socket.io';
+import express from 'express';
 import {
   applyPendingMigrations,
   assertDatabaseIntegrity,
@@ -44,11 +45,30 @@ export interface StartNayaroServerOptions extends ServerConfigInput {
   readonly logger?: Logger;
   /** How often open sockets have their session rechecked. Tests shorten it. */
   readonly socketSessionRecheckMs?: number;
+  /** Managed platforms run migrations separately before deploying. */
+  readonly applyMigrations?: boolean;
 }
 
 const SESSION_PRUNE_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 export async function startNayaroServer(
+  options: StartNayaroServerOptions,
+): Promise<NayaroServerHandle> {
+  const handle = await createNayaroServer(options);
+  try {
+    await listen(handle.httpServer, handle.config.host, handle.config.port);
+    const boundPort = (handle.httpServer.address() as AddressInfo).port;
+    const baseUrl = handle.config.baseUrl.replace(/:\d+$/, `:${String(boundPort)}`);
+    handle.logger.info(`Listening on ${baseUrl}`);
+    return { ...handle, baseUrl };
+  } catch (error: unknown) {
+    await stopNayaroServer(handle);
+    throw error;
+  }
+}
+
+/** Creates the API and WebSocket server without opening a listening port. */
+export async function createNayaroServer(
   options: StartNayaroServerOptions,
 ): Promise<NayaroServerHandle> {
   const config = resolveServerConfig(options);
@@ -72,9 +92,14 @@ export async function startNayaroServer(
       databaseFilePath: config.databaseFilePath,
       ...(config.databaseAuthToken ? { authToken: config.databaseAuthToken } : {}),
     };
-    const migrations = await applyPendingMigrations(database);
-    if (migrations.applied.length > 0) {
-      logger.info(`Applied ${String(migrations.applied.length)} migration(s)`, migrations.applied);
+    if (options.applyMigrations !== false) {
+      const migrations = await applyPendingMigrations(database);
+      if (migrations.applied.length > 0) {
+        logger.info(
+          `Applied ${String(migrations.applied.length)} migration(s)`,
+          migrations.applied,
+        );
+      }
     }
 
     const prisma = createPrismaClient(database);
@@ -82,7 +107,7 @@ export async function startNayaroServer(
 
     await assertDatabaseIntegrity(prisma);
     await prisma.$queryRaw`SELECT 1`;
-    logger.info(`Database ready (journal mode: ${migrations.journalMode})`);
+    logger.info('Database ready');
 
     const isAllowedOrigin = createOriginPolicy(config.webOrigins);
     let io: SocketIOServer | null = null;
@@ -100,13 +125,18 @@ export async function startNayaroServer(
       realtime: createRealtimeEmitter(() => io),
     });
 
-    const httpServer = createServer(app);
+    const root = express();
+    root.disable('x-powered-by');
+    root.set('trust proxy', config.trustProxy);
+    root.use(config.apiBasePath || '/', app);
+    const httpServer = createServer(root);
     unwind.push(() => closeHttpServer(httpServer));
 
     io = createSocketServer(httpServer, {
       logger: logger.child('socket'),
       prisma,
       isAllowedOrigin,
+      path: `${config.apiBasePath}/socket.io`,
       ...(options.socketSessionRecheckMs !== undefined
         ? { sessionRecheckMs: options.socketSessionRecheckMs }
         : {}),
@@ -114,10 +144,6 @@ export async function startNayaroServer(
     const socketServer = io;
     unwind.push(() => closeSocketServer(socketServer));
 
-    await listen(httpServer, config.host, config.port);
-    const boundPort = (httpServer.address() as AddressInfo).port;
-    const baseUrl = config.baseUrl.replace(/:\d+$/, `:${String(boundPort)}`);
-    logger.info(`Listening on ${baseUrl}`);
     if (config.webOrigins.length === 0) {
       logger.warn('WEB_ORIGINS is empty: browsers on other origins cannot call this API.');
     }
@@ -133,7 +159,7 @@ export async function startNayaroServer(
 
     return {
       config,
-      baseUrl,
+      baseUrl: config.baseUrl,
       httpServer,
       io: socketServer,
       prisma,

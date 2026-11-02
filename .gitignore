@@ -5,6 +5,7 @@ node_modules/
 out/
 dist/
 .vite/
+.vercel/
 *.tsbuildinfo
 
 # local data / secrets

@@ -11,15 +11,15 @@ import tailwindcss from '@tailwindcss/vite';
  * Hosting should also send this policy as an HTTP header.
  */
 function contentSecurityPolicy(apiUrl: string): Plugin {
-  const api = new URL(apiUrl);
-  const socket = `${api.protocol === 'https:' ? 'wss:' : 'ws:'}//${api.host}`;
+  const api = apiUrl.startsWith('/') ? null : new URL(apiUrl);
+  const socket = api ? `${api.protocol === 'https:' ? 'wss:' : 'ws:'}//${api.host}` : null;
   const policy = [
     "default-src 'self'",
     "script-src 'self'",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
-    `connect-src 'self' ${api.origin} ${socket}`,
+    `connect-src 'self'${api ? ` ${api.origin} ${socket}` : ''}`,
     "object-src 'none'",
     "frame-src 'none'",
     "frame-ancestors 'none'",
@@ -39,7 +39,7 @@ function contentSecurityPolicy(apiUrl: string): Plugin {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, resolve(__dirname, '../..'), 'VITE_');
-  const apiUrl = env['VITE_API_URL'] ?? process.env['VITE_API_URL'] ?? 'http://localhost:4000';
+  const apiUrl = process.env['VITE_API_URL'] ?? env['VITE_API_URL'] ?? '/api';
   return {
     envDir: resolve(__dirname, '../..'),
     plugins: [react(), tailwindcss(), contentSecurityPolicy(apiUrl)],
@@ -49,7 +49,17 @@ export default defineConfig(({ mode }) => {
         '@nayaro/shared': resolve(__dirname, '../../packages/shared/src'),
       },
     },
-    server: { port: 5180, strictPort: true },
+    server: {
+      port: 5180,
+      strictPort: true,
+      proxy: {
+        '/api': {
+          target: process.env['DEV_API_URL'] ?? 'http://localhost:4000',
+          ws: true,
+          rewrite: (path) => path.replace(/^\/api(?=\/|$)/, ''),
+        },
+      },
+    },
     preview: { port: 5180 },
   };
 });

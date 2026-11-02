@@ -102,7 +102,11 @@ function update(patch: Partial<RealtimeSnapshot>): void {
 }
 
 async function createSocket(): Promise<Socket> {
-  const created = io(API_BASE_URL, {
+  const endpoint = new URL(API_BASE_URL, window.location.origin);
+  const created = io(endpoint.origin, {
+    path: `${endpoint.pathname.replace(/\/+$/, '')}/socket.io`,
+    // Vercel routes WebSocket upgrades directly; polling would require sticky sessions.
+    transports: ['websocket'],
     // Reconnect forever. A POS that silently stops receiving kitchen updates
     // after N failed attempts is worse than one that keeps trying quietly.
     reconnection: true,

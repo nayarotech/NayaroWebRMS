@@ -29,6 +29,7 @@ export interface CreateSocketServerDeps {
   readonly isAllowedOrigin: (origin: string | undefined) => boolean;
   /** How often a connected socket's session is rechecked. Tests shorten it. */
   readonly sessionRecheckMs?: number;
+  readonly path?: string;
 }
 
 /** Long enough to cost nothing; short enough that a revoked phone goes dark promptly. */
@@ -61,6 +62,7 @@ export function createSocketServer(
   const recheckMs = deps.sessionRecheckMs ?? SOCKET_SESSION_RECHECK_MS;
 
   const io = new SocketIOServer(httpServer, {
+    path: deps.path ?? '/socket.io',
     // Socket.IO does its own CORS check, so it needs the same policy the REST
     // middleware applies - not a second, looser one.
     cors: {

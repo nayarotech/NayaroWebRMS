@@ -1,7 +1,8 @@
 /**
- * Where the API lives. Set VITE_API_URL at build time for each deployment; the
- * value is public (it is in the browser bundle) and must never carry secrets.
+ * Browser requests use the public /api route on this deployment by default.
+ * VITE_API_URL can override it for a separately hosted API. Runtime-only service
+ * binding URLs must never be embedded in this static browser bundle.
  */
 export const API_BASE_URL: string = (
-  (import.meta.env?.['VITE_API_URL'] as string | undefined) ?? 'http://localhost:4000'
+  (import.meta.env?.['VITE_API_URL'] as string | undefined) ?? '/api'
 ).replace(/\/+$/, '');

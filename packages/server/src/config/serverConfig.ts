@@ -14,6 +14,11 @@ const serverConfigSchema = z.object({
   /** A filesystem path or a libSQL URL. */
   databaseFilePath: z.string().min(1),
   databaseAuthToken: z.string().min(1).optional(),
+  /** Public mount point; standalone deployments keep their existing root routes. */
+  apiBasePath: z
+    .string()
+    .regex(/^(?:\/[a-zA-Z0-9_-]+)*$/)
+    .default(''),
   /** Browser origins allowed to call the API, e.g. https://app.nayaro.tech */
   webOrigins: z.array(z.string().min(1)).default([]),
   trustProxy: z.union([z.boolean(), z.number(), z.string()]).default(false),
