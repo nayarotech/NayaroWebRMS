@@ -14,7 +14,7 @@
     "start": "tsx scripts/start.ts",
     "db:migrate": "tsx scripts/migrate.ts",
     "demo:seed": "tsx scripts/seed-demo.ts",
-    "tenant": "tsx scripts/tenant.ts",
+    "tenant": "node --import tsx scripts/tenant.ts",
     "test": "tsx scripts/verify-saas.ts",
     "verify": "tsx scripts/verify-server.ts",
     "typecheck": "tsc --noEmit",

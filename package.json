@@ -22,7 +22,7 @@
     "start": "npm run start --workspace @nayaro/server",
     "db:migrate": "npm run db:migrate --workspace @nayaro/server",
     "demo:seed": "npm run demo:seed --workspace @nayaro/server",
-    "tenant": "npm run tenant --workspace @nayaro/server",
+    "tenant": "npm run tenant --workspace @nayaro/server --",
     "test": "npm run test --workspace @nayaro/server",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "eslint .",

@@ -1,7 +1,16 @@
 import { parseArgs } from 'node:util';
-import { applyPendingMigrations, createPrismaClient, type TenantStatus } from '@nayaro/database';
+import { randomUUID } from 'node:crypto';
+import { mkdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import {
+  applyPendingMigrations,
+  createPrismaClient,
+  toDatabaseUrl,
+  type TenantStatus,
+} from '@nayaro/database';
 import { setTenantStatus } from '../src/modules/tenant/tenant.service';
 import { loadEnvironment, resolveDatabaseLocation } from './env';
+import { resetTenantData } from './reset-tenant-data';
 
 /**
  * Platform operator CLI. Tenant lifecycle is never exposed through the tenant
@@ -12,20 +21,32 @@ import { loadEnvironment, resolveDatabaseLocation } from './env';
  */
 const USAGE = `Usage:
   npm run tenant -- list
-  npm run tenant -- status <workspace> --set TRIAL|ACTIVE|SUSPENDED|CANCELLED [--until YYYY-MM-DD|never] [--reason text]`;
+  npm run tenant -- status <workspace> --set TRIAL|ACTIVE|SUSPENDED|CANCELLED [--until YYYY-MM-DD|never] [--reason text]
+  npm run tenant -- reset-data <workspace> [--execute]
+
+reset-data previews by default. Stop the API before --execute.
+Keeps staff, menu, floor plan, settings, offers, recipes, payroll profiles and security logs.
+Clears transaction history and customers, zeros stock and restarts numbering.
+Local SQLite databases only; a full backup is created before clearing data.`;
 
 const STATUSES: readonly TenantStatus[] = ['TRIAL', 'ACTIVE', 'SUSPENDED', 'CANCELLED'];
 
 loadEnvironment();
 const { positionals, values } = parseArgs({
   allowPositionals: true,
-  options: { set: { type: 'string' }, until: { type: 'string' }, reason: { type: 'string' } },
+  options: {
+    set: { type: 'string' },
+    until: { type: 'string' },
+    reason: { type: 'string' },
+    execute: { type: 'boolean', default: false },
+  },
 });
 
 const databaseFilePath = resolveDatabaseLocation();
 const authToken = process.env['DATABASE_AUTH_TOKEN'];
 const database = { databaseFilePath, ...(authToken ? { authToken } : {}) };
-await applyPendingMigrations(database);
+// Preview/reset should not run migrations against an operator's database.
+if (positionals[0] !== 'reset-data') await applyPendingMigrations(database);
 const prisma = createPrismaClient(database);
 
 try {
@@ -53,6 +74,34 @@ try {
         orders: tenant._count.orders,
       })),
     );
+  } else if (command === 'reset-data' && workspace) {
+    if (!toDatabaseUrl(databaseFilePath).startsWith('file:')) {
+      throw new Error('reset-data supports local SQLite databases only.');
+    }
+    const tenant = await prisma.restaurant.findUniqueOrThrow({
+      where: { slug: workspace },
+      select: {
+        name: true,
+        _count: { select: { orders: true, invoices: true, payments: true, customers: true } },
+      },
+    });
+    console.log(`Reset transaction data for ${tenant.name} (${workspace}):`);
+    console.table(tenant._count);
+    console.log('Keeps staff, menu, tables, settings, recipes, offers and payroll profiles.');
+    console.log(
+      'Clears transactions and customers, zeros stock, restarts numbering and signs out staff.',
+    );
+    if (values.execute) {
+      const backupDir = fileURLToPath(new URL('../.data/backups/', import.meta.url));
+      mkdirSync(backupDir, { recursive: true });
+      const backupPath = `${backupDir}before-reset-${randomUUID()}.db`;
+      await resetTenantData(prisma, workspace, backupPath);
+      console.log(`Reset complete. Backup: ${backupPath}`);
+    } else {
+      console.log(
+        'Preview only. Stop the API, then repeat with --execute to reset this restaurant.',
+      );
+    }
   } else if (command === 'status' && workspace && values.set) {
     const status = values.set.toUpperCase() as TenantStatus;
     if (!STATUSES.includes(status)) throw new Error(USAGE);

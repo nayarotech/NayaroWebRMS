@@ -38,6 +38,23 @@ http://localhost:5180/m/himalayan-kitchen.
 
 To start over, stop the API, delete `packages/server/.data/`, and seed again.
 
+To empty one restaurant while keeping its staff logins, menu, tables and settings,
+stop the API and run:
+
+```bash
+npm run tenant -- reset-data himalayan-kitchen             # preview
+npm run tenant -- reset-data himalayan-kitchen --execute   # clear data
+```
+
+This clears orders, kitchen tickets, invoices, payments, refunds, customers,
+credit/loyalty history, expenses, cash-drawer history, payroll history and saved
+request receipts. Stock quantities become zero and order/KOT/invoice numbering
+restarts. Staff must sign in again. Inventory items, recipes, payroll profiles,
+offers and security logs are kept; other restaurants are unchanged. A full SQLite
+backup is saved under `packages/server/.data/backups/` before any data is cleared.
+This command supports local SQLite databases only. Do not seed again afterward;
+the existing restaurant remains available with its existing credentials.
+
 ### Suggested demo path
 
 1. Sign in as **owner**: the dashboard's Overview, Reports, Orders, Inventory and
