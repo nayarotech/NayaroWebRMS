@@ -3,7 +3,7 @@ import { createBrowserRouter, Navigate } from 'react-router';
 import type { AuthenticatedStaff, StaffRole } from '@nayaro/shared';
 import { hasServicePermission } from '@nayaro/shared';
 import { AppShell } from '@/components/layout/AppShell';
-import { AuthenticatedRoute, HomeRedirect, PublicRoute, RoleRoute } from './routeGuards';
+import { AuthenticatedRoute, PublicRoute, RoleRoute } from './routeGuards';
 import { LoginScreen } from '@/screens/LoginScreen';
 
 /** Screens load on first visit, so signing in does not download the whole back office. */
@@ -58,6 +58,9 @@ const AvailabilityScreen = lazy(() =>
 const PayrollScreen = lazy(() =>
   import('@/screens/PayrollScreen').then((module) => ({ default: module.PayrollScreen })),
 );
+const LandingScreen = lazy(() =>
+  import('@/screens/LandingScreen').then((module) => ({ default: module.LandingScreen })),
+);
 const RegisterScreen = lazy(() =>
   import('@/screens/RegisterScreen').then((module) => ({ default: module.RegisterScreen })),
 );
@@ -92,6 +95,8 @@ export const router = createBrowserRouter([
   {
     element: <PublicRoute />,
     children: [
+      // Visitors get the landing page; signed-in staff are sent to work by PublicRoute.
+      { path: '/', element: <LandingScreen /> },
       { path: '/login', element: <LoginScreen /> },
       { path: '/register', element: <RegisterScreen /> },
     ],
@@ -102,7 +107,6 @@ export const router = createBrowserRouter([
       {
         element: <AppShell />,
         children: [
-          { index: true, element: <HomeRedirect /> },
           { path: '/dashboard', element: guard(MANAGEMENT, <DashboardScreen />) },
           { path: '/tables', element: guard(TAKES_ORDERS, <TablesScreen />) },
           { path: '/kitchen', element: <KitchenScreen /> },
