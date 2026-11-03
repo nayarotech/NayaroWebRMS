@@ -82,7 +82,27 @@ export async function registerTenant(
   options: { readonly trialDays?: number; readonly status?: TenantStatus } = {},
 ): Promise<RegisterTenantResult> {
   const input: RegisterTenantInput = registerTenantSchema.parse(rawInput);
-  const passwordHash = await hashPassword(input.owner.password);
+  // An email given here is NOT verified, so it is not stored: only the
+  // verified sign-up (registration.service.ts) attaches one to the owner.
+  return createTenant(prisma, input, await hashPassword(input.owner.password), null, options);
+}
+
+export interface TenantCreationOptions {
+  readonly trialDays?: number;
+  readonly status?: TenantStatus;
+}
+
+/**
+ * The transaction behind both sign-up paths, taking an already-hashed password
+ * so the verified path never has to hold the plain text between its two steps.
+ */
+export async function createTenant(
+  prisma: NayaroPrismaClient,
+  input: RegisterTenantInput,
+  passwordHash: string,
+  verifiedEmail: string | null,
+  options: TenantCreationOptions = {},
+): Promise<RegisterTenantResult> {
   const settings = { ...NEW_TENANT_SETTINGS, ...(input.settings ?? {}) };
   const trialDays = options.trialDays ?? TRIAL_DAYS;
   const status = options.status ?? 'TRIAL';
@@ -98,6 +118,13 @@ export async function registerTenant(
         'WORKSPACE_TAKEN',
         'That workspace code is already in use. Choose another.',
       );
+    }
+
+    if (verifiedEmail !== null) {
+      const emailTaken = await tx.staff.findUnique({ where: { email: verifiedEmail }, select: { id: true } });
+      if (emailTaken) {
+        throw new ApiError(409, 'EMAIL_TAKEN', 'An account already uses that email. Sign in instead.');
+      }
     }
 
     const restaurant = await tx.restaurant.create({
@@ -141,6 +168,7 @@ export async function registerTenant(
         passwordHash,
         role: 'OWNER',
         isActive: true,
+        ...(verifiedEmail === null ? {} : { email: verifiedEmail, emailVerifiedAt: new Date() }),
       },
     });
 

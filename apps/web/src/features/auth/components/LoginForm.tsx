@@ -6,7 +6,7 @@ import { TextField } from '@/components/ui/TextField';
 import { InlineAlert } from '@/components/ui/States';
 import { lastWorkspace, useAuthStore } from '@/stores/authStore';
 import { homePathFor } from '@/app/navigation';
-import { useAuth } from '../hooks/useAuth';
+import { isEmail, useAuth } from '../hooks/useAuth';
 import { lookupWorkspace } from '../api/auth.api';
 
 export function LoginForm(): JSX.Element {
@@ -18,14 +18,17 @@ export function LoginForm(): JSX.Element {
   const clearNotice = useAuthStore((state) => state.clearNotice);
 
   const [workspace, setWorkspace] = useState(() => params.get('workspace') ?? lastWorkspace());
-  const [username, setUsername] = useState('');
+  const [identifier, setIdentifier] = useState(() => params.get('email') ?? '');
   const [password, setPassword] = useState('');
-  const restaurantName = useWorkspaceName(workspace);
+  // An email is unique across Nayaro RMS, so it needs no workspace code; a
+  // username is only unique inside one restaurant, so it does.
+  const byEmail = isEmail(identifier);
+  const restaurantName = useWorkspaceName(byEmail ? '' : workspace);
 
   const onSubmit = async (event: FormEvent): Promise<void> => {
     event.preventDefault();
     clearNotice();
-    if (!(await signIn(workspace, username, password))) return;
+    if (!(await signIn(identifier, workspace, password))) return;
     const staff = useAuthStore.getState().staff;
     const from = (location.state as { from?: string } | null)?.from;
     await navigate(from ?? (staff === null ? '/' : homePathFor(staff)), { replace: true });
@@ -45,39 +48,48 @@ export function LoginForm(): JSX.Element {
       )}
 
       <TextField
-        label="Workspace"
-        placeholder="your-restaurant"
-        hint={restaurantName === null ? 'The workspace code your restaurant registered with.' : undefined}
-        autoComplete="organization"
-        autoCapitalize="none"
-        spellCheck={false}
-        autoFocus={workspace === ''}
-        value={workspace}
-        onChange={(event) => {
-          setWorkspace(event.target.value);
-          clearError();
-        }}
-        className={restaurantName === null ? undefined : 'mb-1'}
-      />
-      {restaurantName !== null && (
-        <p className="text-ok-fg mb-4 flex items-center gap-1.5 text-caption font-bold">
-          <CheckCircle2 size={14} aria-hidden />
-          {restaurantName}
-        </p>
-      )}
-
-      <TextField
-        label="Username"
+        label="Email or username"
+        placeholder="you@restaurant.com or ram"
+        hint={
+          identifier === ''
+            ? 'Owners sign in with their email. Staff use the username they were given.'
+            : undefined
+        }
         autoComplete="username"
         autoCapitalize="none"
         spellCheck={false}
-        autoFocus={workspace !== ''}
-        value={username}
+        autoFocus
+        value={identifier}
         onChange={(event) => {
-          setUsername(event.target.value);
+          setIdentifier(event.target.value);
           clearError();
         }}
       />
+
+      {!byEmail && (
+        <>
+          <TextField
+            label="Workspace"
+            placeholder="your-restaurant"
+            hint={restaurantName === null ? 'The workspace code your restaurant registered with.' : undefined}
+            autoComplete="organization"
+            autoCapitalize="none"
+            spellCheck={false}
+            value={workspace}
+            onChange={(event) => {
+              setWorkspace(event.target.value);
+              clearError();
+            }}
+            className={restaurantName === null ? undefined : 'mb-1'}
+          />
+          {restaurantName !== null && (
+            <p className="text-ok-fg mb-4 flex items-center gap-1.5 text-caption font-bold">
+              <CheckCircle2 size={14} aria-hidden />
+              {restaurantName}
+            </p>
+          )}
+        </>
+      )}
 
       <TextField
         label="Password"
@@ -96,7 +108,7 @@ export function LoginForm(): JSX.Element {
         type="submit"
         size="lg"
         loading={isSigningIn}
-        disabled={workspace.trim() === '' || username.trim() === '' || password === ''}
+        disabled={identifier.trim() === '' || (!byEmail && workspace.trim() === '') || password === ''}
         className="w-full"
       >
         {isSigningIn ? 'Signing in…' : 'Sign in'}

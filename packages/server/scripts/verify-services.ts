@@ -45,6 +45,7 @@ try {
 
   await applyPendingMigrations({ databaseFilePath });
   const options = {
+    allowDirectRegistration: true,
     databaseFilePath,
     host: '127.0.0.1',
     port: 0,

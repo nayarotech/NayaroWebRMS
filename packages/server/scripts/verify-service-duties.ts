@@ -18,6 +18,7 @@ import { startNayaroServer, stopNayaroServer } from '../src/server';
 const root = mkdtempSync(join(tmpdir(), 'nayaro-service-duties-'));
 const layout = ensureDataLayout(resolveDataLayout(root));
 const options = {
+  allowDirectRegistration: true,
   host: '127.0.0.1',
   port: 4340,
   databaseFilePath: layout.databaseFilePath,

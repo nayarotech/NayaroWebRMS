@@ -1,4 +1,4 @@
-import type { NayaroPrismaClient } from '@nayaro/database';
+import type { NayaroPrismaClient, TenantStatus } from '@nayaro/database';
 import { ApiError } from '../../utils/apiError';
 import type { Logger } from '../../utils/logger';
 import { hashPassword, needsRehash, verifyPassword } from './password';
@@ -19,7 +19,7 @@ export class LoginFailedError extends ApiError {
   readonly staffId: string | null;
 
   constructor(restaurantId: string | null, staffId: string | null) {
-    super(401, 'INVALID_CREDENTIALS', 'Incorrect workspace, username or password.');
+    super(401, 'INVALID_CREDENTIALS', 'Incorrect email, username or password.');
     this.restaurantId = restaurantId;
     this.staffId = staffId;
   }
@@ -57,15 +57,29 @@ export async function login(
   // One error for an unknown workspace, an unknown user, a disabled account
   // and a wrong password, so the response is not an oracle for which
   // restaurants or staff usernames exist.
-  const restaurant = await prisma.restaurant.findUnique({
-    where: { slug: input.workspace },
-    select: { id: true, isActive: true, status: true, subscriptionEndsAt: true },
-  });
-  const staff = restaurant
-    ? await prisma.staff.findUnique({
-        where: { restaurantId_username: { restaurantId: restaurant.id, username: input.username } },
-      })
-    : null;
+  // Two ways in: a verified email, which is unique across the platform and so
+  // needs no workspace code, or a workspace code plus a username, which is
+  // only unique inside one restaurant. Both end at the same checks below.
+  const restaurantSelect = { id: true, isActive: true, status: true, subscriptionEndsAt: true } as const;
+  let restaurant: { id: string; isActive: boolean; status: TenantStatus; subscriptionEndsAt: Date | null } | null;
+  let staff: Awaited<ReturnType<typeof prisma.staff.findUnique>>;
+  if (input.email !== undefined) {
+    const byEmail = await prisma.staff.findUnique({
+      where: { email: input.email },
+      include: { restaurant: { select: restaurantSelect } },
+    });
+    // An unverified address must never sign in, even if one were stored.
+    const usable = byEmail !== null && byEmail.emailVerifiedAt !== null ? byEmail : null;
+    staff = usable;
+    restaurant = usable?.restaurant ?? null;
+  } else {
+    restaurant = await prisma.restaurant.findUnique({ where: { slug: input.workspace }, select: restaurantSelect });
+    staff = restaurant
+      ? await prisma.staff.findUnique({
+          where: { restaurantId_username: { restaurantId: restaurant.id, username: input.username } },
+        })
+      : null;
+  }
 
   // Password verification runs on EVERY path, including a missing username -
   // see DUMMY_PASSWORD_HASH above. The three failure conditions are then
@@ -97,15 +111,36 @@ export async function login(
     }
   }
 
-  const session = await createSession(
-    prisma,
-    { id: staff.id, restaurantId: staff.restaurantId },
-    { ...client, ...(input.deviceLabel === undefined ? {} : { deviceLabel: input.deviceLabel }) },
-  );
+  const result = await issueStaffSession(prisma, staff, {
+    ...client,
+    ...(input.deviceLabel === undefined ? {} : { deviceLabel: input.deviceLabel }),
+  });
+  logger.info(`Login: ${staff.username} (${staff.role}) via ${input.email === undefined ? 'username' : 'email'}`);
+  return result;
+}
+
+/** The staff fields a session is issued for. */
+export interface SessionStaff {
+  readonly id: string;
+  readonly restaurantId: string;
+  readonly name: string;
+  readonly username: string;
+  readonly role: AuthenticatedStaff['role'];
+  readonly canTakeOrders: boolean;
+  readonly canManageKitchen: boolean;
+}
+
+/**
+ * Issues a session for someone who has already proven who they are - by
+ * password at sign-in, or by the emailed code at the end of sign-up.
+ */
+export async function issueStaffSession(
+  prisma: NayaroPrismaClient,
+  staff: SessionStaff,
+  client: SessionClientInfo = {},
+): Promise<LoginResult> {
+  const session = await createSession(prisma, { id: staff.id, restaurantId: staff.restaurantId }, client);
   await prisma.staff.update({ where: { id: staff.id }, data: { lastLoginAt: new Date() } });
-
-  logger.info(`Login: ${input.workspace}/${staff.username} (${staff.role})`);
-
   return {
     token: session.token,
     expiresAt: session.expiresAt,

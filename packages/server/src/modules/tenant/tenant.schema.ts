@@ -46,6 +46,12 @@ export const newWorkspaceSchema = workspaceSchema.refine(
   'That workspace code is reserved. Choose another.',
 );
 
+/** Lower-cased, so "Ram@Gmail.com" and "ram@gmail.com" are one account. */
+export const emailSchema = trimmed
+  .toLowerCase()
+  .max(254)
+  .pipe(z.email('Enter a valid email address.'));
+
 export const passwordSchema = z
   .string()
   .min(8, 'Password must be at least 8 characters.')
@@ -65,6 +71,8 @@ export const registerTenantSchema = z.object({
 
   owner: z.object({
     name: trimmed.min(1, 'Owner name is required.').max(120),
+    /** Required by the public sign-up, which verifies it before anything is created. */
+    email: emailSchema.optional(),
     username: usernameSchema,
     password: passwordSchema,
   }),

@@ -1,5 +1,5 @@
 import { createLogger, startNayaroServer, stopNayaroServer } from '../src/index';
-import { loadEnvironment, serverOptionsFromEnvironment } from './env';
+import { loadEnvironment, mailerFromEnvironment, serverOptionsFromEnvironment } from './env';
 
 loadEnvironment();
 const logger = createLogger({
@@ -7,7 +7,11 @@ const logger = createLogger({
   level: process.env['NODE_ENV'] === 'production' ? 'info' : 'debug',
 });
 
-const handle = await startNayaroServer({ ...serverOptionsFromEnvironment(), logger });
+const handle = await startNayaroServer({
+  ...serverOptionsFromEnvironment(),
+  logger,
+  mailer: mailerFromEnvironment(logger),
+});
 
 let shuttingDown = false;
 const shutdown = (signal: string): void => {

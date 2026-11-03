@@ -34,6 +34,7 @@ async function call<T>(
 }
 try {
   handle = await startNayaroServer({
+    allowDirectRegistration: true,
     host: '0.0.0.0',
     port: 4355,
     databaseFilePath: join(root, 'data.db'),

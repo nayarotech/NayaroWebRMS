@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { usernameSchema, workspaceSchema } from '../tenant/tenant.schema';
+import { emailSchema, usernameSchema, workspaceSchema } from '../tenant/tenant.schema';
 
 /**
  * Login input. The workspace code names the restaurant; usernames are only
@@ -10,12 +10,19 @@ import { usernameSchema, workspaceSchema } from '../tenant/tenant.schema';
  * differently from signup, "Rajan.S" would create an account nobody could
  * log into.
  */
-export const loginInputSchema = z.object({
-  workspace: workspaceSchema,
-  username: usernameSchema,
+const common = {
   password: z.string().min(1).max(200),
   /** Optional hint about which terminal this is, shown in the sessions list. */
   deviceLabel: z.string().trim().max(64).optional(),
-});
+};
+
+/**
+ * Either a verified email (unique platform-wide, so no workspace is needed) or
+ * a workspace code plus username. Exactly one shape is accepted.
+ */
+export const loginInputSchema = z.union([
+  z.object({ email: emailSchema, workspace: z.undefined().optional(), username: z.undefined().optional(), ...common }),
+  z.object({ workspace: workspaceSchema, username: usernameSchema, email: z.undefined().optional(), ...common }),
+]);
 
 export type LoginInput = z.infer<typeof loginInputSchema>;

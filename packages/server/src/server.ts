@@ -9,6 +9,7 @@ import {
   type NayaroPrismaClient,
 } from '@nayaro/database';
 import { createNayaroApp } from './app';
+import { createLogMailer, type Mailer } from './modules/email/mailer';
 import {
   resolveServerConfig,
   type ResolvedServerConfig,
@@ -47,6 +48,8 @@ export interface StartNayaroServerOptions extends ServerConfigInput {
   readonly socketSessionRecheckMs?: number;
   /** Managed platforms run migrations separately before deploying. */
   readonly applyMigrations?: boolean;
+  /** Sends sign-up codes. Defaults to printing them to the log. */
+  readonly mailer?: Mailer;
 }
 
 const SESSION_PRUNE_INTERVAL_MS = 6 * 60 * 60 * 1000;
@@ -121,6 +124,8 @@ export async function createNayaroServer(
       hsts: config.hsts,
       apiRequestsPerMinute: config.apiRequestsPerMinute,
       registrationsPerHour: config.registrationsPerHour,
+      mailer: options.mailer ?? createLogMailer(logger.child('email')),
+      allowDirectRegistration: config.allowDirectRegistration,
       realtimeReady: () => io !== null,
       realtime: createRealtimeEmitter(() => io),
     });

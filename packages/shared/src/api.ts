@@ -79,13 +79,23 @@ export interface TenantSummary {
   readonly subscriptionEndsAt: string | null;
 }
 
-export interface LoginRequest {
-  /** Workspace code identifying the restaurant. */
-  readonly workspace: string;
-  readonly username: string;
-  readonly password: string;
-  readonly deviceLabel?: string;
-}
+/**
+ * Sign in with a verified email (unique across Nayaro RMS, so no workspace is
+ * needed), or with the restaurant's workspace code plus a username.
+ */
+export type LoginRequest =
+  | {
+      readonly email: string;
+      readonly password: string;
+      readonly deviceLabel?: string;
+    }
+  | {
+      /** Workspace code identifying the restaurant. */
+      readonly workspace: string;
+      readonly username: string;
+      readonly password: string;
+      readonly deviceLabel?: string;
+    };
 
 export interface LoginResponse {
   /** Opaque bearer token, verified by the server on every request. */
@@ -116,6 +126,8 @@ export interface RegisterTenantRequest {
   };
   readonly owner: {
     readonly name: string;
+    /** Verified with an emailed code before the restaurant is created. */
+    readonly email?: string;
     readonly username: string;
     readonly password: string;
   };
@@ -123,6 +135,19 @@ export interface RegisterTenantRequest {
     readonly vatEnabled?: boolean;
     readonly serviceChargeEnabled?: boolean;
   };
+}
+
+/** Step 1 of sign-up: a code has been emailed; nothing is created yet. */
+export interface PendingRegistrationResponse {
+  readonly email: string;
+  readonly expiresAt: string;
+  /** Seconds before another code may be requested. */
+  readonly resendAfterSeconds: number;
+}
+
+export interface VerifyRegistrationRequest {
+  readonly email: string;
+  readonly code: string;
 }
 
 export interface RegisterTenantResponse {

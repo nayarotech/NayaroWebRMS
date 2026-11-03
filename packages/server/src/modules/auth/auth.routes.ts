@@ -172,5 +172,8 @@ function throttleUsername(body: unknown): string {
   const part = (value: unknown): string =>
     // Capped: caller-supplied, and it becomes a map key and a log line.
     typeof value === 'string' ? value.trim().toLowerCase().slice(0, 64) : '';
-  return `${part(record['workspace'])}/${part(record['username'])}`;
+  // An email sign-in is keyed by the address, so guessing passwords for one
+  // owner is throttled whichever way they are attempted.
+  const email = part(record['email']);
+  return email.length > 0 ? `@/${email}` : `${part(record['workspace'])}/${part(record['username'])}`;
 }

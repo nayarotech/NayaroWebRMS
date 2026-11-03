@@ -48,6 +48,7 @@ async function call<T>(
 try {
   const start = () =>
     startNayaroServer({
+      allowDirectRegistration: true,
       host: '127.0.0.1',
       port: 4357,
       databaseFilePath: join(root, 'data.db'),

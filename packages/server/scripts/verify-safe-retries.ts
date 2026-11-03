@@ -47,6 +47,7 @@ async function call<T>(
 try {
   const start = () =>
     startNayaroServer({
+      allowDirectRegistration: true,
       host: '127.0.0.1',
       port: 4342,
       databaseFilePath: layout.databaseFilePath,
@@ -240,8 +241,12 @@ try {
     const seen: RequestInit[] = [];
     globalThis.fetch = async (url, options) => {
       seen.push(options!);
-      // The web client targets its configured API origin; point it at this test server.
-      const target = String(url).replace(/^https?:\/\/[^/]+/, handle!.baseUrl);
+      // The web client targets its configured API: an absolute origin, or the
+      // relative /api route a deployment proxies. Point either at this server.
+      const raw = String(url);
+      const target = raw.startsWith('/')
+        ? `${handle!.baseUrl}${raw.replace(/^\/api(?=\/|$)/, '')}`
+        : raw.replace(/^https?:\/\/[^/]+/, handle!.baseUrl);
       const response = await realFetch(target, options);
       if (seen.length === 1) {
         await response.text();

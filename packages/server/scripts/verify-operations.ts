@@ -69,6 +69,9 @@ async function verifyUpgrade() {
         passwordHash: 'unused',
         role: 'OWNER',
       },
+      // Only the id: on this pre-upgrade schema, later Staff columns (email)
+      // do not exist yet, and a full read-back would ask for them.
+      select: { id: true },
     });
     const { order, invoice } = await createLegacyInvoiceFixture(
       sqlite,
@@ -144,6 +147,7 @@ try {
   await verifyUpgrade();
   const start = () =>
     startNayaroServer({
+      allowDirectRegistration: true,
       host: '127.0.0.1',
       port: 4354,
       databaseFilePath: join(root, 'data.db'),

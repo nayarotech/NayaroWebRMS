@@ -1,11 +1,13 @@
 import { useState, type FormEvent, type JSX } from 'react';
+import type { PendingRegistrationResponse } from '@nayaro/shared';
 import { Link, useNavigate } from 'react-router';
 import { AuthLayout } from '@/components/layout/AuthLayout';
 import { Button } from '@/components/ui/Button';
 import { TextField } from '@/components/ui/TextField';
 import { InlineAlert } from '@/components/ui/States';
 import { ApiRequestError } from '@/services/apiClient';
-import { registerTenant } from '@/features/auth/api/auth.api';
+import { startRegistration } from '@/features/auth/api/auth.api';
+import { VerifyEmailStep } from '@/features/auth/components/VerifyEmailStep';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 
 interface RegisterForm {
@@ -14,8 +16,8 @@ interface RegisterForm {
   address: string;
   phone: string;
   panNumber: string;
-  contactEmail: string;
   ownerName: string;
+  email: string;
   username: string;
   password: string;
   confirmPassword: string;
@@ -27,8 +29,8 @@ const EMPTY: RegisterForm = {
   address: '',
   phone: '',
   panNumber: '',
-  contactEmail: '',
   ownerName: '',
+  email: '',
   username: '',
   password: '',
   confirmPassword: '',
@@ -58,15 +60,16 @@ function validate(form: RegisterForm): Errors {
   if (form.password.length < 8) errors.password = 'Use at least 8 characters.';
   if (form.confirmPassword !== form.password)
     errors.confirmPassword = 'The passwords do not match.';
-  if (form.contactEmail !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.contactEmail)) {
-    errors.contactEmail = 'Enter a valid email address.';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+    errors.email = 'Enter a valid email address. We send a code to verify it.';
   }
   return errors;
 }
 
 export function RegisterScreen(): JSX.Element {
   const navigate = useNavigate();
-  const { signIn } = useAuth();
+  const { completeSignIn } = useAuth();
+  const [pending, setPending] = useState<PendingRegistrationResponse | null>(null);
   const [form, setForm] = useState<RegisterForm>(EMPTY);
   const [workspaceEdited, setWorkspaceEdited] = useState(false);
   const [errors, setErrors] = useState<Errors>({});
@@ -91,25 +94,26 @@ export function RegisterScreen(): JSX.Element {
 
     setSubmitting(true);
     try {
-      await registerTenant({
-        restaurant: {
-          slug: form.workspace,
-          name: form.restaurantName.trim(),
-          ...(form.address.trim() ? { address: form.address.trim() } : {}),
-          ...(form.phone.trim() ? { phone: form.phone.trim() } : {}),
-          ...(form.panNumber.trim() ? { panNumber: form.panNumber.trim() } : {}),
-          ...(form.contactEmail.trim() ? { contactEmail: form.contactEmail.trim() } : {}),
-        },
-        owner: { name: form.ownerName.trim(), username: form.username, password: form.password },
-      });
-      if (await signIn(form.workspace, form.username, form.password)) {
-        await navigate('/dashboard', { replace: true });
-      } else {
-        await navigate(`/login?workspace=${encodeURIComponent(form.workspace)}`, { replace: true });
-      }
+      const email = form.email.trim().toLowerCase();
+      // Nothing is created yet: the server parks the form and emails a code.
+      setPending(
+        await startRegistration({
+          restaurant: {
+            slug: form.workspace,
+            name: form.restaurantName.trim(),
+            ...(form.address.trim() ? { address: form.address.trim() } : {}),
+            ...(form.phone.trim() ? { phone: form.phone.trim() } : {}),
+            ...(form.panNumber.trim() ? { panNumber: form.panNumber.trim() } : {}),
+            contactEmail: email,
+          },
+          owner: { name: form.ownerName.trim(), email, username: form.username, password: form.password },
+        }),
+      );
     } catch (error: unknown) {
       if (error instanceof ApiRequestError && error.code === 'WORKSPACE_TAKEN') {
         setErrors({ workspace: error.message });
+      } else if (error instanceof ApiRequestError && error.code === 'EMAIL_TAKEN') {
+        setErrors({ email: error.message });
       } else {
         setFailure(
           error instanceof ApiRequestError
@@ -121,6 +125,23 @@ export function RegisterScreen(): JSX.Element {
       setSubmitting(false);
     }
   };
+
+  if (pending !== null) {
+    return (
+      <AuthLayout>
+        <VerifyEmailStep
+          pending={pending}
+          onVerified={async (result) => {
+            completeSignIn(result);
+            await navigate('/dashboard', { replace: true });
+          }}
+          onChangeEmail={() => {
+            setPending(null);
+          }}
+        />
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout>
@@ -185,16 +206,6 @@ export function RegisterScreen(): JSX.Element {
               set('address', event.target.value);
             }}
           />
-          <TextField
-            label="Contact email (optional)"
-            type="email"
-            autoComplete="email"
-            value={form.contactEmail}
-            error={errors.contactEmail}
-            onChange={(event) => {
-              set('contactEmail', event.target.value);
-            }}
-          />
         </fieldset>
 
         <fieldset className="mb-2">
@@ -208,6 +219,19 @@ export function RegisterScreen(): JSX.Element {
             error={errors.ownerName}
             onChange={(event) => {
               set('ownerName', event.target.value);
+            }}
+          />
+          <TextField
+            label="Email"
+            type="email"
+            autoComplete="email"
+            autoCapitalize="none"
+            spellCheck={false}
+            hint="We send a 6-digit code to verify it. You can sign in with this email."
+            value={form.email}
+            error={errors.email}
+            onChange={(event) => {
+              set('email', event.target.value);
             }}
           />
           <TextField
@@ -248,7 +272,7 @@ export function RegisterScreen(): JSX.Element {
         {failure !== null && <InlineAlert className="mb-4">{failure}</InlineAlert>}
 
         <Button type="submit" size="lg" loading={submitting} className="w-full">
-          {submitting ? 'Creating your workspace…' : 'Create restaurant'}
+          {submitting ? 'Sending your code…' : 'Continue'}
         </Button>
       </form>
 

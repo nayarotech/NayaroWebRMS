@@ -275,6 +275,10 @@ model Staff {
   canManageKitchen Boolean @default(false)
   isActive     Boolean   @default(true)
   lastLoginAt  DateTime?
+  /// Lower-cased. Unique across the whole platform, because an email signs in
+  /// without a workspace code. Only ever set once it has been verified.
+  email           String?   @unique
+  emailVerifiedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1282,4 +1286,21 @@ model AuditLog {
 
   @@index([restaurantId, createdAt])
   @@index([restaurantId, action])
+}
+
+/// A restaurant sign-up waiting for its owner to enter the emailed code.
+/// Nothing is created in Restaurant/Staff until the code is confirmed, so an
+/// abandoned or mistyped sign-up leaves no tenant behind. `payload` is the
+/// validated form with the password already hashed - never the plain text.
+model PendingRegistration {
+  id         String   @id @default(cuid())
+  email      String   @unique
+  workspace  String
+  payload    String
+  /// SHA-256 of the 6-digit code; the code itself is only ever in the email.
+  codeHash   String
+  attempts   Int      @default(0)
+  expiresAt  DateTime
+  lastSentAt DateTime
+  createdAt  DateTime @default(now())
 }

@@ -45,6 +45,9 @@ declare global {
 export const PUBLIC_ROUTES: ReadonlySet<string> = new Set([
   'GET /health',
   'POST /tenants/register',
+  'POST /tenants/register/start',
+  'POST /tenants/register/resend',
+  'POST /tenants/register/verify',
   'GET /tenants/lookup',
   'POST /auth/login',
   'GET /public/menu',

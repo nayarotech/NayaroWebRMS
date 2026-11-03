@@ -95,6 +95,7 @@ async function main(): Promise<void> {
   rmSync(ROOT, { recursive: true, force: true });
   const layout = ensureDataLayout(resolveDataLayout(ROOT));
   const handle: NayaroServerHandle = await startNayaroServer({
+    allowDirectRegistration: true,
     port: PORT,
     databaseFilePath: layout.databaseFilePath,
     logger: createLogger({ scope: 'verify-reports', silent: true }),

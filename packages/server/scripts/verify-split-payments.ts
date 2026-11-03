@@ -72,6 +72,9 @@ async function main(): Promise<void> {
         passwordHash: 'unused',
         role: 'OWNER',
       },
+      // Only the id: on this pre-upgrade schema, later Staff columns (email)
+      // do not exist yet, and a full read-back would ask for them.
+      select: { id: true },
     });
     const { order, invoice } = await createLegacyInvoiceFixture(
       sqlite,
@@ -122,6 +125,7 @@ async function main(): Promise<void> {
   }
   const start = () =>
     startNayaroServer({
+      allowDirectRegistration: true,
       port: 4353,
       host: '127.0.0.1',
       databaseFilePath: layout.databaseFilePath,

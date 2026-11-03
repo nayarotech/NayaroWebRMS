@@ -25,6 +25,8 @@ const serverConfigSchema = z.object({
   hsts: z.boolean().default(false),
   apiRequestsPerMinute: z.int().min(1).default(600),
   registrationsPerHour: z.int().min(1).default(5),
+  /** One-step sign-up without email verification. Tests and the demo seed only. */
+  allowDirectRegistration: z.boolean().default(false),
   silent: z.boolean().default(false),
 });
 

@@ -5,6 +5,7 @@ import { createCorsMiddleware } from './middleware/cors';
 import { createSecurityHeaders } from './middleware/securityHeaders';
 import { createRateLimit } from './middleware/rateLimit';
 import { createTenantRouter } from './modules/tenant/tenant.routes';
+import type { Mailer } from './modules/email/mailer';
 import { createAuditRouter } from './modules/audit/audit.routes';
 import { createErrorHandler } from './middleware/errorHandler';
 import { createNotFoundHandler } from './middleware/notFound';
@@ -55,6 +56,10 @@ export interface CreateNayaroAppDeps {
   /** Authenticated requests per address per minute. */
   readonly apiRequestsPerMinute?: number;
   readonly registrationsPerHour?: number;
+  /** Sends transactional email (sign-up codes). */
+  readonly mailer: Mailer;
+  /** See TenantRouterDeps.allowDirectRegistration. */
+  readonly allowDirectRegistration?: boolean;
 }
 
 export function createNayaroApp(deps: CreateNayaroAppDeps): Express {
@@ -88,6 +93,8 @@ export function createNayaroApp(deps: CreateNayaroAppDeps): Express {
     createTenantRouter({
       prisma: deps.prisma,
       logger: deps.logger.child('tenant'),
+      mailer: deps.mailer,
+      allowDirectRegistration: deps.allowDirectRegistration === true,
       ...(deps.registrationsPerHour === undefined
         ? {}
         : { registrationsPerHour: deps.registrationsPerHour }),

@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import type { AuthenticatedStaff, TenantSummary } from '@nayaro/shared';
+import type { AuthenticatedStaff, LoginResponse, TenantSummary } from '@nayaro/shared';
 import { ApiRequestError } from '@/services/apiClient';
 import { useAuthStore } from '@/stores/authStore';
 import * as authApi from '../api/auth.api';
@@ -11,7 +11,13 @@ export interface UseAuth {
   readonly isAuthenticated: boolean;
   readonly isSigningIn: boolean;
   readonly error: string | null;
-  signIn: (workspace: string, username: string, password: string) => Promise<boolean>;
+  /**
+   * `identifier` is an email or a username. An email signs in on its own; a
+   * username also needs the workspace code.
+   */
+  signIn: (identifier: string, workspace: string, password: string) => Promise<boolean>;
+  /** Stores a session the server has already issued, e.g. at the end of sign-up. */
+  completeSignIn: (result: LoginResponse) => void;
   signOut: () => Promise<void>;
   clearError: () => void;
 }
@@ -33,16 +39,21 @@ export function useAuth(): UseAuth {
   const [error, setError] = useState<string | null>(null);
 
   const signIn = useCallback(
-    async (workspace: string, username: string, password: string): Promise<boolean> => {
+    async (identifier: string, workspace: string, password: string): Promise<boolean> => {
       setIsSigningIn(true);
       setError(null);
+      const id = identifier.trim();
       try {
-        const result = await authApi.login({
-          workspace: workspace.trim().toLowerCase(),
-          username,
-          password,
-          deviceLabel: describeDevice(),
-        });
+        const result = await authApi.login(
+          isEmail(id)
+            ? { email: id.toLowerCase(), password, deviceLabel: describeDevice() }
+            : {
+                workspace: workspace.trim().toLowerCase(),
+                username: id,
+                password,
+                deviceLabel: describeDevice(),
+              },
+        );
         queryClient.clear();
         setSession(result.token, result.staff, result.tenant);
         return true;
@@ -58,7 +69,9 @@ export function useAuth(): UseAuth {
         ) {
           setError(cause.message);
         } else {
-          setError('Incorrect workspace, username or password.');
+          setError(
+            isEmail(id) ? 'Incorrect email or password.' : 'Incorrect workspace, username or password.',
+          );
         }
         return false;
       } finally {
@@ -79,6 +92,14 @@ export function useAuth(): UseAuth {
     }
   }, [clearSession, queryClient]);
 
+  const completeSignIn = useCallback(
+    (result: LoginResponse): void => {
+      queryClient.clear();
+      setSession(result.token, result.staff, result.tenant);
+    },
+    [queryClient, setSession],
+  );
+
   const clearError = useCallback(() => {
     setError(null);
   }, []);
@@ -90,6 +111,7 @@ export function useAuth(): UseAuth {
     isSigningIn,
     error,
     signIn,
+    completeSignIn,
     signOut,
     clearError,
   };
@@ -119,4 +141,9 @@ function describeDevice(): string {
             ? 'Linux'
             : 'device';
   return `${browser} on ${platform}`;
+}
+
+/** Enough to tell an email from a username, which may not contain "@". */
+export function isEmail(value: string): boolean {
+  return value.includes('@');
 }

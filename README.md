@@ -154,55 +154,28 @@ from Settings → Security.
 
 ## Production deployment
 
-### Vercel services
+### Vercel (website) + Render (API)
 
-Import this repository as **one Vercel project**, with its Root Directory at the
-repository root. The root `vercel.json` builds `web` (`apps/web`, Vite) and
-`server` (`packages/server`, Express) independently. `/api` and `/api/*` reach
-the API, including `/api/socket.io`; all other paths reach the frontend. The
-frontend service includes an SPA fallback for deep links such as `/register`
-and `/m/himalayan-kitchen`.
+The website and the API are hosted separately:
 
-Each service runs `npm ci --include=dev --workspaces --include-workspace-root`
-from the repository root. This includes the root TypeScript
-compiler and workspace build tools even when the build environment sets
-`NODE_ENV=production` or otherwise omits development dependencies by default.
+- **Website on Vercel.** Import this repository as one Vercel project with its
+  Root Directory at the repository root. The root `vercel.json` builds only
+  `apps/web` (Vite) and rewrites deep links such as `/register` and
+  `/m/himalayan-kitchen` to `index.html`. Set `VITE_API_URL` to the API's public
+  URL (e.g. `https://nayarowebrms.onrender.com`, no `/api`, no trailing slash).
+  Vite embeds it at build time, so redeploy after changing it. Never put a
+  database token in a `VITE_` variable.
+- **API on Render** (a Web Service, Root Directory left empty):
+  build `npm install --include=dev`, start `npm start`, health check `/health`.
+  Environment: `NODE_VERSION=22.12.0`, `NODE_ENV=production`, `DATABASE_URL`
+  (`libsql://…turso.io`), `DATABASE_AUTH_TOKEN`, `WEB_ORIGINS` (the website's
+  exact origin, e.g. `https://rms.nayaro.tech`), `TRUST_PROXY=1`,
+  `RESEND_API_KEY` and `EMAIL_FROM` (sign-up verification codes). The API applies
+  pending migrations itself on start.
 
-The web app calls the public `/api` path from the browser. There are currently
-**no server-to-server calls and no internal service bindings**. Do not inject an
-internal binding URL into `VITE_API_URL`: Vite embeds that variable at build time,
-whereas bindings are available only to server functions at runtime.
-
-Configure Vercel environment variables for each deployment environment:
-
-- `DATABASE_URL`: a managed libSQL URL, such as `libsql://your-db.turso.io`.
-  Local SQLite files cannot persist restaurant data on Vercel and are rejected.
-- `DATABASE_AUTH_TOKEN`: the managed database's token, when required.
-- `VITE_API_URL=/api`: optional default; remove any old localhost override.
-- `WEB_ORIGINS`: comma-separated custom frontend origins, if any. Vercel's
-  deployment and production origins are allowed automatically.
-
-Use a separate managed database for Preview deployments to keep test activity
-away from Production. Before deploying a new schema, run `npm run db:migrate`
-from a trusted shell configured with that environment's database credentials.
-The Vercel entrypoint checks schema integrity but does not run migrations on
-each function startup. Never put database tokens in a `VITE_` variable.
-
-Test services locally with `vercel dev` (or `vercel dev --local` without linking
-a cloud project). Run `npm run db:migrate` first for a new local database. The
-existing `npm run dev` also works: Vite proxies `/api` to the standalone API.
-
-The API exports its HTTP server and the browser uses WebSocket transport directly.
-Vercel reconnects are handled by the existing Socket.IO retry and query refresh
-logic. Immediate broadcasts across multiple function instances require a shared
-Socket.IO adapter; the current adapter is in memory, with periodic query refresh
-as a fallback. Rate limits are also per instance (see below).
-
-Validation with Vercel CLI 65.9.0 passes local page, asset and HTTP API checks,
-but its local service proxy resets WebSocket upgrades. The disposable
-`node --import tsx packages/server/scripts/verify-services.ts` suite verifies
-WebSocket authentication directly against the API. Check the WebSocket connection
-in a Vercel Preview deployment before promoting to Production.
+Put the API in the region closest to the database (and to your users): every
+API request runs several database queries in sequence, so the API-to-database
+distance multiplies into page load time.
 
 ### Other hosts
 

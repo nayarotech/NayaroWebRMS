@@ -600,6 +600,7 @@ function verifyBusinessDates(): void {
 try {
   verifyBusinessDates();
   handle = await startNayaroServer({
+    allowDirectRegistration: true,
     port: 0,
     host: '127.0.0.1',
     databaseFilePath: join(root, 'saas.db'),

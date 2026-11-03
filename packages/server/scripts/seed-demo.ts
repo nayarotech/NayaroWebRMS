@@ -54,6 +54,7 @@ const authToken = process.env['DATABASE_AUTH_TOKEN'];
 }
 
 const handle: NayaroServerHandle = await startNayaroServer({
+  allowDirectRegistration: true,
   host: '127.0.0.1',
   port: 0,
   databaseFilePath,

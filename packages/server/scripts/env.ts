@@ -2,6 +2,14 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { StartNayaroServerOptions } from '../src/server';
+import type { Logger } from '../src/utils/logger';
+import {
+  DEFAULT_EMAIL_FROM,
+  createLogMailer,
+  createResendMailer,
+  createUnconfiguredMailer,
+  type Mailer,
+} from '../src/modules/email/mailer';
 
 const serverPackageDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = resolve(serverPackageDir, '..', '..');
@@ -38,6 +46,23 @@ export function resolveDatabaseLocation(): string {
   const file = resolve(serverPackageDir, '.data', 'nayaro.db');
   mkdirSync(dirname(file), { recursive: true });
   return file;
+}
+
+/**
+ * Which mailer this deployment uses: Resend when RESEND_API_KEY is set; in
+ * production without one, a mailer that refuses (sign-up says email is not set
+ * up, everything else keeps working); in development, the log.
+ */
+export function mailerFromEnvironment(logger: Logger): Mailer {
+  const apiKey = process.env['RESEND_API_KEY'];
+  const from = process.env['EMAIL_FROM'] ?? DEFAULT_EMAIL_FROM;
+  if (apiKey) return createResendMailer({ apiKey, from, logger: logger.child('email') });
+  if (process.env['NODE_ENV'] === 'production') {
+    logger.warn('RESEND_API_KEY is not set: restaurant sign-up cannot send verification codes.');
+    return createUnconfiguredMailer();
+  }
+  logger.info('RESEND_API_KEY is not set: verification codes are printed to this log.');
+  return createLogMailer(logger.child('email'));
 }
 
 /** Maps environment variables onto explicit server options. */

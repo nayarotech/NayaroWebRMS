@@ -63,6 +63,7 @@ async function until(condition: () => boolean): Promise<void> {
 
 try {
   handle = await startNayaroServer({
+    allowDirectRegistration: true,
     host: '127.0.0.1',
     port: 4341,
     databaseFilePath: layout.databaseFilePath,
