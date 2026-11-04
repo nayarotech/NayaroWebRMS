@@ -1339,3 +1339,45 @@ model PlatformSession {
 
   @@index([adminId])
 }
+
+/// One anonymous browser on the public site and the app, identified only by a
+/// random id kept in that browser. No IP address is stored.
+model SiteVisitor {
+  id          String   @id
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+  /// The page they are on, refreshed by the heartbeat while the tab is open.
+  currentPath String?
+  signedIn    Boolean  @default(false)
+  sessions    Int      @default(1)
+  country     String?
+  device      String?
+  browser     String?
+  os          String?
+
+  pageViews SitePageView[]
+
+  @@index([lastSeenAt])
+}
+
+model SitePageView {
+  id           String      @id @default(cuid())
+  visitorId    String
+  visitor      SiteVisitor @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+  sessionId    String
+  path         String
+  /// Host of the referring site, or null for direct visits and in-site moves.
+  referrer     String?
+  utmSource    String?
+  country      String?
+  device       String?
+  browser      String?
+  os           String?
+  signedIn     Boolean     @default(false)
+  isNewSession Boolean     @default(false)
+  isNewVisitor Boolean     @default(false)
+  createdAt    DateTime    @default(now())
+
+  @@index([createdAt])
+  @@index([visitorId])
+}

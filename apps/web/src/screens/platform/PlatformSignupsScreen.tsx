@@ -27,7 +27,10 @@ const COLUMNS: readonly Column<PlatformPendingSignup>[] = [
     cell: (row) => (
       <div className="min-w-0">
         <p className="truncate">{row.ownerName}</p>
-        <a href={`mailto:${row.email}`} className="text-accent-hover truncate text-caption hover:underline">
+        <a
+          href={`mailto:${row.email}`}
+          className="text-accent-hover truncate text-caption hover:underline"
+        >
           {row.email}
         </a>
       </div>
@@ -69,7 +72,11 @@ const COLUMNS: readonly Column<PlatformPendingSignup>[] = [
  * address, a spam folder, or someone who gave up. Worth a friendly email.
  */
 export function PlatformSignupsScreen(): JSX.Element {
-  const signups = useQuery({ queryKey: ['platform', 'signups'], queryFn: platformApi.signups, refetchInterval: 30_000 });
+  const signups = useQuery({
+    queryKey: ['platform', 'signups'],
+    queryFn: platformApi.signups,
+    refetchInterval: 30_000,
+  });
   return (
     <Page>
       <PageHeader
@@ -82,10 +89,16 @@ export function PlatformSignupsScreen(): JSX.Element {
           columns={COLUMNS}
           getRowId={(row) => row.email}
           loading={signups.isPending}
-          searchText={(row) => `${row.restaurantName} ${row.workspace} ${row.ownerName} ${row.email}`}
+          searchText={(row) =>
+            `${row.restaurantName} ${row.workspace} ${row.ownerName} ${row.email}`
+          }
           searchPlaceholder="Search restaurant, owner or email…"
           initialSort={{ key: 'started', direction: 'desc' }}
-          empty={{ icon: MailQuestion, title: 'No unfinished sign-ups', description: 'Everyone who started has finished.' }}
+          empty={{
+            icon: MailQuestion,
+            title: 'No unfinished sign-ups',
+            description: 'Everyone who started has finished.',
+          }}
         />
       </Card>
     </Page>

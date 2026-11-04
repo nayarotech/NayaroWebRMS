@@ -41,7 +41,10 @@ export function PlatformOverviewScreen(): JSX.Element {
     series === 'signups'
       ? toBars(data.signupsPerDay, (v) => `${String(v)} new restaurant${v === 1 ? '' : 's'}`)
       : series === 'active'
-        ? toBars(data.activeRestaurantsPerDay, (v) => `${String(v)} restaurant${v === 1 ? '' : 's'} used the app`)
+        ? toBars(
+            data.activeRestaurantsPerDay,
+            (v) => `${String(v)} restaurant${v === 1 ? '' : 's'} used the app`,
+          )
         : toBars(data.billsPerDay, (v) => `${String(v)} bill${v === 1 ? '' : 's'} issued`);
 
   return (
@@ -59,10 +62,14 @@ export function PlatformOverviewScreen(): JSX.Element {
             >
               <span
                 aria-hidden
-                className={cn('size-2 rounded-full', data.onlineNow.people > 0 ? 'bg-ok animate-pulse' : 'bg-muted-3')}
+                className={cn(
+                  'size-2 rounded-full',
+                  data.onlineNow.people > 0 ? 'bg-ok animate-pulse' : 'bg-muted-3',
+                )}
               />
-              {data.onlineNow.people} {data.onlineNow.people === 1 ? 'person' : 'people'} in {data.onlineNow.restaurants}{' '}
-              restaurant{data.onlineNow.restaurants === 1 ? '' : 's'} right now
+              {data.onlineNow.people} {data.onlineNow.people === 1 ? 'person' : 'people'} in{' '}
+              {data.onlineNow.restaurants} restaurant{data.onlineNow.restaurants === 1 ? '' : 's'}{' '}
+              right now
             </span>
           </span>
         }
@@ -130,7 +137,7 @@ export function PlatformOverviewScreen(): JSX.Element {
             <BarChart
               label="Last 30 days"
               data={chart}
-              formatAxis={(value) => String(Math.round(value))}
+              formatAxis={(value) => (Number.isInteger(value) ? String(value) : '')}
               labelEvery={5}
             />
           </CardBody>
@@ -138,7 +145,10 @@ export function PlatformOverviewScreen(): JSX.Element {
 
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
           <Card>
-            <CardHeader title="Trials ending soon" description="Talk to them before the trial runs out." />
+            <CardHeader
+              title="Trials ending soon"
+              description="Talk to them before the trial runs out."
+            />
             {data.trialsEndingSoon.length === 0 ? (
               <EmptyState icon={Clock} title="No trials ending this week" className="py-8" />
             ) : (
@@ -152,7 +162,8 @@ export function PlatformOverviewScreen(): JSX.Element {
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-body font-bold">{row.name}</p>
                         <p className="text-muted truncate text-caption">
-                          {row.owner?.name ?? '—'} · {row.owner?.email ?? row.contactEmail ?? row.phone ?? ''}
+                          {row.owner?.name ?? '—'} ·{' '}
+                          {row.owner?.email ?? row.contactEmail ?? row.phone ?? ''}
                         </p>
                       </div>
                       <span className="text-caption">
@@ -169,7 +180,10 @@ export function PlatformOverviewScreen(): JSX.Element {
             <CardHeader
               title="Newest restaurants"
               actions={
-                <Link to="/admin/restaurants" className="text-accent-hover text-caption font-bold hover:underline">
+                <Link
+                  to="/admin/restaurants"
+                  className="text-accent-hover text-caption font-bold hover:underline"
+                >
                   All restaurants
                 </Link>
               }
@@ -177,11 +191,15 @@ export function PlatformOverviewScreen(): JSX.Element {
             <ul className="divide-border border-border divide-y border-t">
               {data.recentSignups.map((row) => (
                 <li key={row.id}>
-                  <Link to={`/admin/restaurants/${row.id}`} className="hover:bg-surface-2 flex items-center gap-3 px-5 py-3">
+                  <Link
+                    to={`/admin/restaurants/${row.id}`}
+                    className="hover:bg-surface-2 flex items-center gap-3 px-5 py-3"
+                  >
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-body font-bold">{row.name}</p>
                       <p className="text-muted truncate text-caption">
-                        Joined {formatRelative(row.createdAt)} · {row.bills30d} bills · {formatPaisa(row.sales30dPaisa)}
+                        Joined {formatRelative(row.createdAt)} · {row.bills30d} bills ·{' '}
+                        {formatPaisa(row.sales30dPaisa)}
                       </p>
                     </div>
                     <TenantStatusBadge status={row.status} />
@@ -197,7 +215,10 @@ export function PlatformOverviewScreen(): JSX.Element {
             title="Happening now"
             description="Sign-ups, sign-ins, staff changes and account events across every restaurant."
             actions={
-              <Link to="/admin/activity" className="text-accent-hover text-caption font-bold hover:underline">
+              <Link
+                to="/admin/activity"
+                className="text-accent-hover text-caption font-bold hover:underline"
+              >
                 Full activity
               </Link>
             }

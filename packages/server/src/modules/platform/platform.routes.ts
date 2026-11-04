@@ -21,6 +21,7 @@ import {
   platformTenants,
   startSupportView,
 } from './platform.service';
+import { siteAnalyticsReport } from '../siteAnalytics/siteAnalytics.service';
 
 export interface PlatformRouterDeps {
   readonly prisma: NayaroPrismaClient;
@@ -116,6 +117,17 @@ export function createPlatformRouter(deps: PlatformRouterDeps): Router {
     );
     deps.logger.info(`Support view: ${admin.email} -> ${view.tenant.workspace}`);
     res.status(201).json(view);
+  });
+
+  router.get('/platform/site-analytics', guard, async (req, res) => {
+    const range = typeof req.query['range'] === 'string' ? req.query['range'] : undefined;
+    const timeZone = typeof req.query['tz'] === 'string' ? req.query['tz'] : undefined;
+    res.json(
+      await siteAnalyticsReport(deps.prisma, {
+        ...(range === undefined ? {} : { range }),
+        ...(timeZone === undefined ? {} : { timeZone }),
+      }),
+    );
   });
 
   router.get('/platform/signups', guard, async (_req, res) => {

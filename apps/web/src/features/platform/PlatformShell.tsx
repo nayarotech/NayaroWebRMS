@@ -1,6 +1,6 @@
 import { useEffect, useState, type JSX } from 'react';
 import { NavLink, Navigate, Outlet, useLocation } from 'react-router';
-import { Activity, LayoutDashboard, LogOut, MailQuestion, Store, type LucideIcon } from 'lucide-react';
+import { Activity, BarChart3, LayoutDashboard, LogOut, MailQuestion, Store, type LucideIcon } from 'lucide-react';
 import { NayaroLogo } from '@/components/layout/NayaroBrand';
 import { EmptyState, LoadingState } from '@/components/ui/States';
 import { Button } from '@/components/ui/Button';
@@ -9,6 +9,7 @@ import { platformApi, usePlatformStore } from './platformApi';
 
 const NAV: readonly { to: string; label: string; icon: LucideIcon; end?: boolean }[] = [
   { to: '/admin', label: 'Overview', icon: LayoutDashboard, end: true },
+  { to: '/admin/website', label: 'Website', icon: BarChart3 },
   { to: '/admin/restaurants', label: 'Restaurants', icon: Store },
   { to: '/admin/signups', label: 'Unfinished sign-ups', icon: MailQuestion },
   { to: '/admin/activity', label: 'Activity', icon: Activity },

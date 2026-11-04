@@ -33,12 +33,19 @@ const COLUMNS: readonly Column<PlatformTenantRow>[] = [
     cell: (row) => (
       <div className="min-w-0">
         <p className="truncate">{row.owner?.name ?? '—'}</p>
-        <p className="text-muted-2 truncate text-caption">{row.owner?.email ?? row.contactEmail ?? row.phone}</p>
+        <p className="text-muted-2 truncate text-caption">
+          {row.owner?.email ?? row.contactEmail ?? row.phone}
+        </p>
       </div>
     ),
     hideBelow: 'md',
   },
-  { key: 'status', header: 'Status', cell: (row) => <TenantStatusBadge status={row.status} />, sortValue: (row) => row.status },
+  {
+    key: 'status',
+    header: 'Status',
+    cell: (row) => <TenantStatusBadge status={row.status} />,
+    sortValue: (row) => row.status,
+  },
   {
     key: 'ends',
     header: 'Trial / plan',
@@ -58,7 +65,8 @@ const COLUMNS: readonly Column<PlatformTenantRow>[] = [
         <LastActive iso={row.lastActiveAt} online={row.onlineNow} />
       </span>
     ),
-    sortValue: (row) => (row.onlineNow > 0 ? Number.MAX_SAFE_INTEGER : Date.parse(row.lastActiveAt ?? '1970-01-01')),
+    sortValue: (row) =>
+      row.onlineNow > 0 ? Number.MAX_SAFE_INTEGER : Date.parse(row.lastActiveAt ?? '1970-01-01'),
     hideBelow: 'md',
   },
   {
@@ -89,13 +97,19 @@ const COLUMNS: readonly Column<PlatformTenantRow>[] = [
 export function PlatformTenantsScreen(): JSX.Element {
   const navigate = useNavigate();
   const [filter, setFilter] = useState<Filter>('all');
-  const tenants = useQuery({ queryKey: ['platform', 'tenants'], queryFn: platformApi.tenants, refetchInterval: 30_000 });
+  const tenants = useQuery({
+    queryKey: ['platform', 'tenants'],
+    queryFn: platformApi.tenants,
+    refetchInterval: 30_000,
+  });
 
   const rows = useMemo(() => {
     const all = tenants.data?.tenants ?? [];
     if (filter === 'all') return all;
     if (filter === 'ending') {
-      return all.filter((row) => row.status === 'TRIAL' && row.daysLeft !== null && row.daysLeft <= 7);
+      return all.filter(
+        (row) => row.status === 'TRIAL' && row.daysLeft !== null && row.daysLeft <= 7,
+      );
     }
     if (filter === 'online') return all.filter((row) => row.onlineNow > 0);
     return all.filter((row) => row.status === filter);

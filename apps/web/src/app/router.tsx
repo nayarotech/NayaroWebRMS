@@ -73,6 +73,9 @@ const PlatformTenantsScreen = lazy(() =>
 const PlatformTenantScreen = lazy(() =>
   import('@/screens/platform/PlatformTenantScreen').then((module) => ({ default: module.PlatformTenantScreen })),
 );
+const PlatformWebsiteScreen = lazy(() =>
+  import('@/screens/platform/PlatformWebsiteScreen').then((module) => ({ default: module.PlatformWebsiteScreen })),
+);
 const PlatformSignupsScreen = lazy(() =>
   import('@/screens/platform/PlatformSignupsScreen').then((module) => ({ default: module.PlatformSignupsScreen })),
 );
@@ -120,6 +123,7 @@ export const router = createBrowserRouter([
     element: <PlatformShell />,
     children: [
       { index: true, element: <PlatformOverviewScreen /> },
+      { path: 'website', element: <PlatformWebsiteScreen /> },
       { path: 'restaurants', element: <PlatformTenantsScreen /> },
       { path: 'restaurants/:id', element: <PlatformTenantScreen /> },
       { path: 'signups', element: <PlatformSignupsScreen /> },

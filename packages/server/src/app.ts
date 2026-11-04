@@ -6,6 +6,7 @@ import { createSecurityHeaders } from './middleware/securityHeaders';
 import { createRateLimit } from './middleware/rateLimit';
 import { createTenantRouter } from './modules/tenant/tenant.routes';
 import { createPlatformRouter } from './modules/platform/platform.routes';
+import { createSiteAnalyticsRouter } from './modules/siteAnalytics/siteAnalytics.routes';
 import type { Mailer } from './modules/email/mailer';
 import { createAuditRouter } from './modules/audit/audit.routes';
 import { createErrorHandler } from './middleware/errorHandler';
@@ -102,6 +103,7 @@ export function createNayaroApp(deps: CreateNayaroAppDeps): Express {
     }),
   );
   app.use(createPlatformRouter({ prisma: deps.prisma, logger: deps.logger.child('platform') }));
+  app.use(createSiteAnalyticsRouter({ prisma: deps.prisma, logger: deps.logger.child('analytics') }));
   app.use(createAuditRouter(deps.prisma));
   app.use(createAuthRouter({ prisma: deps.prisma, logger: deps.logger.child('auth') }));
   app.use(

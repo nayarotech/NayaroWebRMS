@@ -156,3 +156,60 @@ export interface PlatformActivityResponse {
 export type PlatformImpersonationResponse = LoginResponse & {
   readonly impersonation: { readonly adminName: string; readonly expiresAt: string };
 };
+
+// --- Website analytics (rms.nayaro.tech visitors) ---------------------------
+
+export type SiteAnalyticsRange = 'today' | '7d' | '30d' | '90d';
+
+export interface SiteAnalyticsTotals {
+  readonly uniqueVisitors: number;
+  readonly newVisitors: number;
+  readonly visits: number;
+  readonly pageViews: number;
+  readonly pagesPerVisit: number;
+}
+
+export interface SiteAnalyticsRow {
+  readonly key: string;
+  readonly value: number;
+}
+
+export interface SiteAnalyticsReport {
+  readonly range: SiteAnalyticsRange;
+  readonly generatedAt: string;
+  readonly live: {
+    /** Browsers with the site open in the last few minutes. */
+    readonly visitors: number;
+    readonly signedIn: number;
+    readonly restaurantsOnline: number;
+    readonly staffOnline: number;
+    readonly pages: readonly SiteAnalyticsRow[];
+    readonly countries: readonly SiteAnalyticsRow[];
+  };
+  readonly current: SiteAnalyticsTotals;
+  /** The same length of time just before; null when nothing was recorded then. */
+  readonly previous: SiteAnalyticsTotals | null;
+  /** Hourly for "today" (last 24 hours), daily otherwise. */
+  readonly series: readonly { readonly key: string; readonly label: string; readonly visitors: number; readonly pageViews: number }[];
+  readonly topPages: readonly SiteAnalyticsRow[];
+  readonly referrers: readonly SiteAnalyticsRow[];
+  readonly countries: readonly SiteAnalyticsRow[];
+  readonly devices: readonly SiteAnalyticsRow[];
+  readonly browsers: readonly SiteAnalyticsRow[];
+  readonly os: readonly SiteAnalyticsRow[];
+  /** Landing page, sign-in/registration, the restaurant app, guest QR menus. */
+  readonly areas: readonly SiteAnalyticsRow[];
+}
+
+/** What the browser sends for each page view. */
+export interface SiteHitRequest {
+  readonly visitorId: string;
+  readonly sessionId: string;
+  readonly newSession: boolean;
+  readonly path: string;
+  readonly referrer?: string;
+  readonly utmSource?: string | null;
+  readonly timeZone?: string;
+  readonly language?: string;
+  readonly signedIn?: boolean;
+}

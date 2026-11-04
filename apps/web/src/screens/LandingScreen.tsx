@@ -569,7 +569,7 @@ function Pricing(): JSX.Element {
               ))}
             </ul>
             <a
-              href={`mailto:hello@nayaro.tech?subject=${encodeURIComponent('Nayaro RMS pricing')}`}
+              href={`mailto:info@nayaro.tech?subject=${encodeURIComponent('Nayaro RMS pricing')}`}
               className="border-border-3 bg-surface hover:border-border-4 mt-8 rounded-md border py-3.5 text-center font-bold"
             >
               Ask for a quote
@@ -651,7 +651,7 @@ function Cta(): JSX.Element {
             Start free trial
           </Link>
           <a
-            href={`mailto:hello@nayaro.tech?subject=${encodeURIComponent('Nayaro RMS demo')}`}
+            href={`mailto:info@nayaro.tech?subject=${encodeURIComponent('Nayaro RMS demo')}`}
             className="rounded-md border border-white/60 px-6 py-3.5 font-bold text-white hover:bg-white/10"
           >
             Book a demo
@@ -704,7 +704,7 @@ function Footer(): JSX.Element {
           ['Nayaro Games', 'https://games.nayaro.tech'],
           ['nayaro.tech', 'https://nayaro.tech'],
         ])}
-        {column('Contact', [['hello@nayaro.tech', 'mailto:hello@nayaro.tech']])}
+        {column('Contact', [['info@nayaro.tech', 'mailto:info@nayaro.tech']])}
       </div>
       <div className="border-t border-[#1e2738]">
         <p className={cn(container, 'py-6 text-[13px] text-slate-500')}>{nayaroCopyright()}</p>

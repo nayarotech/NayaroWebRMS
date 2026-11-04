@@ -290,7 +290,9 @@ export function PlatformTenantScreen(): JSX.Element {
               label="Last 30 days"
               data={bars}
               formatAxis={
-                chart === 'sales' ? formatCompactPaisa : (value) => String(Math.round(value))
+                chart === 'sales'
+                  ? formatCompactPaisa
+                  : (value) => (Number.isInteger(value) ? String(value) : '')
               }
               labelEvery={5}
             />

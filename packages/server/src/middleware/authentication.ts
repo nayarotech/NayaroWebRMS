@@ -52,6 +52,8 @@ export const PUBLIC_ROUTES: ReadonlySet<string> = new Set([
   'GET /tenants/lookup',
   'POST /auth/login',
   'GET /public/menu',
+  'POST /analytics/hit',
+  'POST /analytics/ping',
 ]);
 
 function isPublic(method: string, path: string): boolean {

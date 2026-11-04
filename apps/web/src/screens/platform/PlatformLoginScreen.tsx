@@ -80,7 +80,13 @@ export function PlatformLoginScreen(): JSX.Element {
             }}
           />
           {error !== null && <InlineAlert className="mb-4">{error}</InlineAlert>}
-          <Button type="submit" size="lg" className="w-full" loading={busy} disabled={email === '' || password === ''}>
+          <Button
+            type="submit"
+            size="lg"
+            className="w-full"
+            loading={busy}
+            disabled={email === '' || password === ''}
+          >
             Sign in
           </Button>
         </form>

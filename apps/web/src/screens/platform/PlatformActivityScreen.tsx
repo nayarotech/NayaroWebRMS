@@ -41,7 +41,11 @@ export function PlatformActivityScreen(): JSX.Element {
             </ul>
             {feed.hasNextPage && (
               <div className="border-border border-t p-4 text-center">
-                <Button variant="secondary" loading={feed.isFetchingNextPage} onClick={() => void feed.fetchNextPage()}>
+                <Button
+                  variant="secondary"
+                  loading={feed.isFetchingNextPage}
+                  onClick={() => void feed.fetchNextPage()}
+                >
                   Load older
                 </Button>
               </div>

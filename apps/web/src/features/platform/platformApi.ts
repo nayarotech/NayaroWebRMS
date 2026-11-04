@@ -9,6 +9,8 @@ import type {
   PlatformTenantAction,
   PlatformTenantDetail,
   PlatformTenantsResponse,
+  SiteAnalyticsRange,
+  SiteAnalyticsReport,
 } from '@nayaro/shared';
 import { API_BASE_URL } from '@/config/env';
 import { ApiRequestError } from '@/services/apiClient';
@@ -85,6 +87,11 @@ export const platformApi = {
     request<PlatformTenantDetail>('POST', `/platform/tenants/${encodeURIComponent(id)}/actions`, action),
   supportView: (id: string) =>
     request<PlatformImpersonationResponse>('POST', `/platform/tenants/${encodeURIComponent(id)}/support-view`),
+  website: (range: SiteAnalyticsRange) =>
+    request<SiteAnalyticsReport>(
+      'GET',
+      `/platform/site-analytics?range=${range}&tz=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}`,
+    ),
   signups: () => request<{ signups: PlatformPendingSignup[] }>('GET', '/platform/signups'),
   activity: (before?: string) =>
     request<PlatformActivityResponse>(
