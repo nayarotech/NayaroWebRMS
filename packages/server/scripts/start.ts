@@ -1,5 +1,10 @@
 import { createLogger, startNayaroServer, stopNayaroServer } from '../src/index';
-import { loadEnvironment, mailerFromEnvironment, serverOptionsFromEnvironment } from './env';
+import {
+  enquiryHubFromEnvironment,
+  loadEnvironment,
+  mailerFromEnvironment,
+  serverOptionsFromEnvironment,
+} from './env';
 
 loadEnvironment();
 const logger = createLogger({
@@ -11,6 +16,7 @@ const handle = await startNayaroServer({
   ...serverOptionsFromEnvironment(),
   logger,
   mailer: mailerFromEnvironment(logger),
+  enquiryHub: enquiryHubFromEnvironment(),
 });
 
 let shuttingDown = false;

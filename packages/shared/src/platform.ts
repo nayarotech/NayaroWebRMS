@@ -213,3 +213,22 @@ export interface SiteHitRequest {
   readonly language?: string;
   readonly signedIn?: boolean;
 }
+
+// --- Enquiries (sent to the central Nayaro inbox at nayaro.tech) -----------
+
+export type EnquiryKind = 'quote' | 'demo' | 'contact';
+
+export interface EnquiryRequest {
+  readonly kind: EnquiryKind;
+  readonly name: string;
+  readonly email: string;
+  readonly phone?: string;
+  /** The restaurant's name. */
+  readonly company?: string;
+  readonly outlets?: string;
+  readonly message?: string;
+  /** Page the form was opened from, e.g. "/#pricing". */
+  readonly page?: string;
+  /** Spam trap: a hidden field people never fill in. */
+  readonly website?: string;
+}

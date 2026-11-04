@@ -10,6 +10,7 @@ import {
 } from '@nayaro/database';
 import { createNayaroApp } from './app';
 import { createLogMailer, type Mailer } from './modules/email/mailer';
+import type { EnquiryHubConfig } from './modules/enquiries/enquiries.routes';
 import {
   resolveServerConfig,
   type ResolvedServerConfig,
@@ -50,6 +51,8 @@ export interface StartNayaroServerOptions extends ServerConfigInput {
   readonly applyMigrations?: boolean;
   /** Sends sign-up codes. Defaults to printing them to the log. */
   readonly mailer?: Mailer;
+  /** The central Nayaro inbox for quote and demo requests; null leaves it off. */
+  readonly enquiryHub?: EnquiryHubConfig | null;
 }
 
 const SESSION_PRUNE_INTERVAL_MS = 6 * 60 * 60 * 1000;
@@ -126,6 +129,7 @@ export async function createNayaroServer(
       registrationsPerHour: config.registrationsPerHour,
       mailer: options.mailer ?? createLogMailer(logger.child('email')),
       allowDirectRegistration: config.allowDirectRegistration,
+      enquiryHub: options.enquiryHub ?? null,
       realtimeReady: () => io !== null,
       realtime: createRealtimeEmitter(() => io),
     });

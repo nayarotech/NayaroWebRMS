@@ -1,4 +1,6 @@
-import type { JSX, ReactNode } from 'react';
+import { useState, type JSX, type ReactNode } from 'react';
+import type { EnquiryKind } from '@nayaro/shared';
+import { EnquiryDialog } from '@/features/enquiries/EnquiryDialog';
 import { Link } from 'react-router';
 import {
   ArrowRight,
@@ -34,6 +36,12 @@ import { cn } from '@/lib/utils';
  * to happen.
  */
 export function LandingScreen(): JSX.Element {
+  // Quote and demo requests open a form here; the server forwards them to the
+  // central Nayaro inbox at nayaro.tech.
+  const [enquiry, setEnquiry] = useState<{ kind: EnquiryKind; page: string } | null>(null);
+  const enquire = (page: string) => (kind: EnquiryKind) => {
+    setEnquiry({ kind, page });
+  };
   return (
     <div className="bg-surface text-text min-h-dvh">
       <Hero />
@@ -42,10 +50,17 @@ export function LandingScreen(): JSX.Element {
       <Features />
       <Roles />
       <YourData />
-      <Pricing />
+      <Pricing onEnquire={enquire('/#pricing')} />
       <Faq />
-      <Cta />
+      <Cta onEnquire={enquire('/#cta')} />
       <Footer />
+      <EnquiryDialog
+        kind={enquiry?.kind ?? null}
+        page={enquiry?.page ?? '/'}
+        onClose={() => {
+          setEnquiry(null);
+        }}
+      />
     </div>
   );
 }
@@ -54,10 +69,20 @@ export function LandingScreen(): JSX.Element {
 // Brand pieces
 // ---------------------------------------------------------------------------
 
-function Lockup({ onDark = false, className = 'h-6' }: { onDark?: boolean; className?: string }): JSX.Element {
+function Lockup({
+  onDark = false,
+  className = 'h-6',
+}: {
+  onDark?: boolean;
+  className?: string;
+}): JSX.Element {
   return (
     <span className="inline-flex items-center gap-2.5">
-      <img src={onDark ? logoOnDark : logoOnLight} alt="Nayaro" className={cn(className, 'w-auto')} />
+      <img
+        src={onDark ? logoOnDark : logoOnLight}
+        alt="Nayaro"
+        className={cn(className, 'w-auto')}
+      />
       <span
         className={cn(
           'rounded border px-1.5 py-1 font-mono text-[10px] leading-none tracking-[0.18em] uppercase',
@@ -70,7 +95,13 @@ function Lockup({ onDark = false, className = 'h-6' }: { onDark?: boolean; class
   );
 }
 
-function Eyebrow({ children, onDark = false }: { children: ReactNode; onDark?: boolean }): JSX.Element {
+function Eyebrow({
+  children,
+  onDark = false,
+}: {
+  children: ReactNode;
+  onDark?: boolean;
+}): JSX.Element {
   return (
     <p
       className={cn(
@@ -106,7 +137,14 @@ function SectionHeading({
         {title}
       </h2>
       {lead !== undefined && (
-        <p className={cn('mt-4 text-[17px] leading-relaxed', onDark ? 'text-slate-300' : 'text-muted')}>{lead}</p>
+        <p
+          className={cn(
+            'mt-4 text-[17px] leading-relaxed',
+            onDark ? 'text-slate-300' : 'text-muted',
+          )}
+        >
+          {lead}
+        </p>
       )}
     </div>
   );
@@ -132,7 +170,10 @@ function Hero(): JSX.Element {
           <a href="#top" aria-label="Nayaro RMS home">
             <Lockup onDark className="h-5 sm:h-6" />
           </a>
-          <nav aria-label="Sections" className="hidden items-center gap-8 text-sm text-slate-300 md:flex">
+          <nav
+            aria-label="Sections"
+            className="hidden items-center gap-8 text-sm text-slate-300 md:flex"
+          >
             <a href="#how" className="hover:text-white">
               How it works
             </a>
@@ -147,7 +188,10 @@ function Hero(): JSX.Element {
             </a>
           </nav>
           <div className="flex items-center gap-2">
-            <Link to="/login" className="rounded-md px-3 py-2 text-sm font-semibold text-slate-200 hover:text-white">
+            <Link
+              to="/login"
+              className="rounded-md px-3 py-2 text-sm font-semibold text-slate-200 hover:text-white"
+            >
               Log in
             </Link>
             <Link
@@ -162,7 +206,10 @@ function Hero(): JSX.Element {
 
       <div
         id="top"
-        className={cn(container, 'relative grid items-center gap-14 pt-10 pb-20 lg:grid-cols-[1.05fr_1fr] lg:pt-16 lg:pb-28')}
+        className={cn(
+          container,
+          'relative grid items-center gap-14 pt-10 pb-20 lg:grid-cols-[1.05fr_1fr] lg:pt-16 lg:pb-28',
+        )}
       >
         <div>
           <Eyebrow onDark>Restaurant POS · Nepal</Eyebrow>
@@ -174,8 +221,9 @@ function Hero(): JSX.Element {
             One screen.
           </h1>
           <p className="mt-6 max-w-xl text-lg leading-relaxed text-slate-300">
-            Nayaro RMS runs your floor, kitchen and counter together - orders go straight to the kitchen, bills come out
-            with VAT and service charge done, and the day closes itself with a report you can trust.
+            Nayaro RMS runs your floor, kitchen and counter together - orders go straight to the
+            kitchen, bills come out with VAT and service charge done, and the day closes itself with
+            a report you can trust.
           </p>
           <p className="mt-2 text-[15px] text-slate-400">टेबलदेखि बिलसम्म — सबै काम एउटै ठाउँमा।</p>
 
@@ -211,11 +259,27 @@ function Hero(): JSX.Element {
 }
 
 const MOCK_TABLES = [
-  { name: 'T1', status: 'Occupied', tone: 'border-status-occupied/50 bg-status-occupied/10 text-status-occupied' },
-  { name: 'T2', status: 'Preparing', tone: 'border-status-preparing/50 bg-status-preparing/10 text-status-preparing' },
+  {
+    name: 'T1',
+    status: 'Occupied',
+    tone: 'border-status-occupied/50 bg-status-occupied/10 text-status-occupied',
+  },
+  {
+    name: 'T2',
+    status: 'Preparing',
+    tone: 'border-status-preparing/50 bg-status-preparing/10 text-status-preparing',
+  },
   { name: 'T3', status: 'Available', tone: 'border-slate-200 bg-white text-slate-500' },
-  { name: 'T4', status: 'Ready', tone: 'border-status-ready/50 bg-status-ready/10 text-status-ready' },
-  { name: 'T5', status: 'Payment', tone: 'border-status-payment/50 bg-status-payment/10 text-status-payment' },
+  {
+    name: 'T4',
+    status: 'Ready',
+    tone: 'border-status-ready/50 bg-status-ready/10 text-status-ready',
+  },
+  {
+    name: 'T5',
+    status: 'Payment',
+    tone: 'border-status-payment/50 bg-status-payment/10 text-status-payment',
+  },
   { name: 'T6', status: 'Available', tone: 'border-slate-200 bg-white text-slate-500' },
 ] as const;
 
@@ -228,7 +292,9 @@ function HeroMock(): JSX.Element {
           <div className="flex items-baseline justify-between">
             <div>
               <p className="text-[15px] font-bold">Himalayan Kitchen</p>
-              <p className="text-accent font-mono text-[10px] tracking-[0.18em] uppercase">Floor plan · Main hall</p>
+              <p className="text-accent font-mono text-[10px] tracking-[0.18em] uppercase">
+                Floor plan · Main hall
+              </p>
             </div>
             <span className="text-[11px] font-semibold text-slate-500">5 of 6 in use</span>
           </div>
@@ -252,8 +318,12 @@ function HeroMock(): JSX.Element {
 
       <div className="relative -mt-10 ml-auto w-[290px] rounded-2xl bg-white p-5 text-slate-900 shadow-[0_24px_64px_rgb(0_0_0/0.45)] sm:absolute sm:right-0 sm:bottom-0 sm:mt-0 lg:-right-6">
         <div className="flex items-center justify-between">
-          <p className="font-mono text-[10px] tracking-[0.18em] text-slate-500 uppercase">Tax invoice</p>
-          <span className="bg-accent/10 text-accent rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold">#182</span>
+          <p className="font-mono text-[10px] tracking-[0.18em] text-slate-500 uppercase">
+            Tax invoice
+          </p>
+          <span className="bg-accent/10 text-accent rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold">
+            #182
+          </span>
         </div>
         <p className="mt-2 text-[20px] font-bold">T4 · ₨ 671.00</p>
         <p className="text-accent font-mono text-[11px]">FY 2083/84 · Paid by cash</p>
@@ -285,16 +355,29 @@ function HeroMock(): JSX.Element {
 function MadeFor(): JSX.Element {
   return (
     <section className="border-border bg-surface-2 border-b">
-      <div className={cn(container, 'flex flex-col gap-4 py-6 lg:flex-row lg:items-center lg:justify-between')}>
+      <div
+        className={cn(
+          container,
+          'flex flex-col gap-4 py-6 lg:flex-row lg:items-center lg:justify-between',
+        )}
+      >
         <p className="text-muted text-[15px]">Made for every kind of kitchen</p>
         <ul className="flex flex-wrap gap-2">
-          {['Restaurants', 'Cafés', 'Momo & khaja ghar', 'Bars & lounges', 'Hotel restaurants', 'Cloud kitchens'].map(
-            (kind) => (
-              <li key={kind} className="border-border-3 bg-surface rounded-full border px-3.5 py-1.5 text-[14px]">
-                {kind}
-              </li>
-            ),
-          )}
+          {[
+            'Restaurants',
+            'Cafés',
+            'Momo & khaja ghar',
+            'Bars & lounges',
+            'Hotel restaurants',
+            'Cloud kitchens',
+          ].map((kind) => (
+            <li
+              key={kind}
+              className="border-border-3 bg-surface rounded-full border px-3.5 py-1.5 text-[14px]"
+            >
+              {kind}
+            </li>
+          ))}
         </ul>
       </div>
     </section>
@@ -344,7 +427,9 @@ function HowItWorks(): JSX.Element {
               key={step.title}
               className="border-border flex flex-col border-b p-6 last:border-b-0 sm:[&:nth-child(odd)]:border-r lg:border-r lg:border-b-0 lg:last:border-r-0"
             >
-              <span className="text-accent font-mono text-[13px]">{String(index + 1).padStart(2, '0')}</span>
+              <span className="text-accent font-mono text-[13px]">
+                {String(index + 1).padStart(2, '0')}
+              </span>
               <h3 className="mt-4 text-[17px] font-bold">{step.title}</h3>
               <p className="text-muted mt-2 flex-1 text-[15px] leading-relaxed">{step.body}</p>
               <span className="bg-surface-2 text-text-3 mt-6 rounded-md px-2.5 py-1.5 font-mono text-[12px]">
@@ -408,7 +493,10 @@ const FEATURES: readonly { icon: LucideIcon; title: string; body: string }[] = [
 
 function Features(): JSX.Element {
   return (
-    <section id="features" className="border-border bg-surface-2 scroll-mt-4 border-y py-20 sm:py-24">
+    <section
+      id="features"
+      className="border-border bg-surface-2 scroll-mt-4 border-y py-20 sm:py-24"
+    >
       <div className={container}>
         <SectionHeading
           eyebrow="Features"
@@ -489,7 +577,11 @@ function YourData(): JSX.Element {
     <section className="relative overflow-hidden bg-[#0a0e17] py-20 sm:py-24">
       <div aria-hidden className="ny-diagonal-dark absolute inset-0" />
       <div className={cn(container, 'relative')}>
-        <SectionHeading eyebrow="Your data" title="Money is involved. We built it that way." onDark />
+        <SectionHeading
+          eyebrow="Your data"
+          title="Money is involved. We built it that way."
+          onDark
+        />
         <div className="mt-12 grid overflow-hidden rounded-card border border-[#1e2738] bg-[#111726] sm:grid-cols-2">
           {PROMISES.map(({ icon: Icon, title, body }, index) => (
             <article
@@ -512,7 +604,7 @@ function YourData(): JSX.Element {
   );
 }
 
-function Pricing(): JSX.Element {
+function Pricing({ onEnquire }: { readonly onEnquire: (kind: EnquiryKind) => void }): JSX.Element {
   return (
     <section id="pricing" className="scroll-mt-4 py-20 sm:py-24">
       <div className={container}>
@@ -525,7 +617,8 @@ function Pricing(): JSX.Element {
               <span className="text-muted text-2xl font-semibold">days</span>
             </p>
             <p className="text-muted mt-3 text-[15px]">
-              Every feature, no card, no setup fee. Register in a few minutes and take your first order today.
+              Every feature, no card, no setup fee. Register in a few minutes and take your first
+              order today.
             </p>
             <ul className="mt-6 flex-1 space-y-3 text-[15px]">
               {[
@@ -550,11 +643,13 @@ function Pricing(): JSX.Element {
           </div>
 
           <div className="border-border bg-surface-2 flex flex-col rounded-card border p-8">
-            <p className="text-muted-2 font-mono text-[11px] font-semibold tracking-[0.2em] uppercase">Subscription</p>
+            <p className="text-muted-2 font-mono text-[11px] font-semibold tracking-[0.2em] uppercase">
+              Subscription
+            </p>
             <h3 className="font-display mt-3 text-3xl font-bold">Monthly or yearly</h3>
             <p className="text-muted mt-3 text-[15px]">
-              Priced for your restaurant’s size and number of outlets. We help you set up your menu, tables and tax
-              settings.
+              Priced for your restaurant’s size and number of outlets. We help you set up your menu,
+              tables and tax settings.
             </p>
             <ul className="text-muted mt-6 flex-1 space-y-3 text-[15px]">
               {[
@@ -568,12 +663,15 @@ function Pricing(): JSX.Element {
                 </li>
               ))}
             </ul>
-            <a
-              href={`mailto:info@nayaro.tech?subject=${encodeURIComponent('Nayaro RMS pricing')}`}
+            <button
+              type="button"
+              onClick={() => {
+                onEnquire('quote');
+              }}
               className="border-border-3 bg-surface hover:border-border-4 mt-8 rounded-md border py-3.5 text-center font-bold"
             >
               Ask for a quote
-            </a>
+            </button>
           </div>
         </div>
       </div>
@@ -635,27 +733,40 @@ function Faq(): JSX.Element {
   );
 }
 
-function Cta(): JSX.Element {
+function Cta({ onEnquire }: { readonly onEnquire: (kind: EnquiryKind) => void }): JSX.Element {
   return (
     <section className="bg-accent relative overflow-hidden">
       <div aria-hidden className="ny-diagonal-light absolute inset-0" />
-      <div className={cn(container, 'relative flex flex-col gap-8 py-16 lg:flex-row lg:items-center lg:justify-between')}>
+      <div
+        className={cn(
+          container,
+          'relative flex flex-col gap-8 py-16 lg:flex-row lg:items-center lg:justify-between',
+        )}
+      >
         <div>
           <h2 className="font-display text-[30px] font-bold tracking-tight text-white sm:text-[40px]">
             Run a calmer service tonight.
           </h2>
-          <p className="mt-3 text-[17px] text-white/85">Set up in an afternoon. Free for 14 days.</p>
+          <p className="mt-3 text-[17px] text-white/85">
+            Set up in an afternoon. Free for 14 days.
+          </p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <Link to="/register" className="text-accent rounded-md bg-white px-6 py-3.5 font-bold hover:bg-white/90">
+          <Link
+            to="/register"
+            className="text-accent rounded-md bg-white px-6 py-3.5 font-bold hover:bg-white/90"
+          >
             Start free trial
           </Link>
-          <a
-            href={`mailto:info@nayaro.tech?subject=${encodeURIComponent('Nayaro RMS demo')}`}
+          <button
+            type="button"
+            onClick={() => {
+              onEnquire('demo');
+            }}
             className="rounded-md border border-white/60 px-6 py-3.5 font-bold text-white hover:bg-white/10"
           >
             Book a demo
-          </a>
+          </button>
         </div>
       </div>
     </section>
@@ -665,7 +776,9 @@ function Cta(): JSX.Element {
 function Footer(): JSX.Element {
   const column = (title: string, links: readonly (readonly [string, string])[]): JSX.Element => (
     <div>
-      <p className="font-mono text-[11px] font-semibold tracking-[0.2em] text-slate-500 uppercase">{title}</p>
+      <p className="font-mono text-[11px] font-semibold tracking-[0.2em] text-slate-500 uppercase">
+        {title}
+      </p>
       <ul className="mt-4 space-y-2.5 text-[15px] text-slate-300">
         {links.map(([label, href]) => (
           <li key={label}>
@@ -704,7 +817,10 @@ function Footer(): JSX.Element {
           ['Nayaro Games', 'https://games.nayaro.tech'],
           ['nayaro.tech', 'https://nayaro.tech'],
         ])}
-        {column('Contact', [['info@nayaro.tech', 'mailto:info@nayaro.tech']])}
+        {column('Contact', [
+          ['info@nayaro.tech', 'mailto:info@nayaro.tech'],
+          ['+977 9807381017', 'tel:+9779807381017'],
+        ])}
       </div>
       <div className="border-t border-[#1e2738]">
         <p className={cn(container, 'py-6 text-[13px] text-slate-500')}>{nayaroCopyright()}</p>

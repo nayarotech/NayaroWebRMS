@@ -65,6 +65,16 @@ export function mailerFromEnvironment(logger: Logger): Mailer {
   return createLogMailer(logger.child('email'));
 }
 
+/**
+ * The central Nayaro inbox (nayaro.tech API) that quote and demo requests are
+ * forwarded to. Both must be set; the key is this product's own (rms:...).
+ */
+export function enquiryHubFromEnvironment(): { url: string; key: string } | null {
+  const url = process.env['NAYARO_HUB_URL'];
+  const key = process.env['NAYARO_HUB_KEY'];
+  return url && key ? { url, key } : null;
+}
+
 /** Maps environment variables onto explicit server options. */
 export function serverOptionsFromEnvironment(): StartNayaroServerOptions {
   const production = process.env['NODE_ENV'] === 'production';

@@ -7,6 +7,7 @@ import { createRateLimit } from './middleware/rateLimit';
 import { createTenantRouter } from './modules/tenant/tenant.routes';
 import { createPlatformRouter } from './modules/platform/platform.routes';
 import { createSiteAnalyticsRouter } from './modules/siteAnalytics/siteAnalytics.routes';
+import { createEnquiriesRouter, type EnquiryHubConfig } from './modules/enquiries/enquiries.routes';
 import type { Mailer } from './modules/email/mailer';
 import { createAuditRouter } from './modules/audit/audit.routes';
 import { createErrorHandler } from './middleware/errorHandler';
@@ -62,6 +63,8 @@ export interface CreateNayaroAppDeps {
   readonly mailer: Mailer;
   /** See TenantRouterDeps.allowDirectRegistration. */
   readonly allowDirectRegistration?: boolean;
+  /** Where quote and demo requests are forwarded (the central Nayaro inbox). */
+  readonly enquiryHub?: EnquiryHubConfig | null;
 }
 
 export function createNayaroApp(deps: CreateNayaroAppDeps): Express {
@@ -104,6 +107,7 @@ export function createNayaroApp(deps: CreateNayaroAppDeps): Express {
   );
   app.use(createPlatformRouter({ prisma: deps.prisma, logger: deps.logger.child('platform') }));
   app.use(createSiteAnalyticsRouter({ prisma: deps.prisma, logger: deps.logger.child('analytics') }));
+  app.use(createEnquiriesRouter({ hub: deps.enquiryHub ?? null, logger: deps.logger.child('enquiries') }));
   app.use(createAuditRouter(deps.prisma));
   app.use(createAuthRouter({ prisma: deps.prisma, logger: deps.logger.child('auth') }));
   app.use(
