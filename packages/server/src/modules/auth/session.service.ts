@@ -95,6 +95,13 @@ export async function createSession(
 export interface ResolvedSession {
   readonly sessionId: string;
   readonly staff: AuthenticatedStaff;
+  /** Present when a Nayaro platform admin is viewing as this staff member. */
+  readonly impersonation?: SessionImpersonation;
+}
+
+export interface SessionImpersonation {
+  readonly adminName: string;
+  readonly expiresAt: string;
 }
 
 export type SessionCheck =
@@ -142,7 +149,10 @@ export async function checkSession(
   const block = tenantBlock(session.restaurant);
   if (block !== null) return { ok: false, reason: block };
 
-  if (options.touch !== false) await touchSession(prisma, session.id, session.lastSeenAt);
+  // A support view keeps its fixed one-hour expiry; activity never extends it.
+  if (options.touch !== false && session.impersonatedByAdminId === null) {
+    await touchSession(prisma, session.id, session.lastSeenAt);
+  }
 
   return {
     ok: true,
@@ -157,6 +167,14 @@ export async function checkSession(
         canTakeOrders: session.staff.canTakeOrders,
         canManageKitchen: session.staff.canManageKitchen,
       },
+      ...(session.impersonatedByAdminId === null
+        ? {}
+        : {
+            impersonation: {
+              adminName: session.impersonatorName ?? 'Nayaro support',
+              expiresAt: session.expiresAt.toISOString(),
+            },
+          }),
     },
   };
 }

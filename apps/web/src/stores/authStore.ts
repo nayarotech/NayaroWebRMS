@@ -22,15 +22,22 @@ const WORKSPACE_KEY = 'nayaro.workspace';
 
 export type SessionStatus = 'verifying' | 'authenticated' | 'anonymous';
 
+export interface SupportView {
+  readonly adminName: string;
+  readonly expiresAt: string;
+}
+
 interface AuthState {
   token: string | null;
   status: SessionStatus;
   staff: AuthenticatedStaff | null;
   tenant: TenantSummary | null;
+  /** Set while Nayaro support is viewing this account read-only. */
+  impersonation: SupportView | null;
   /** Shown on the sign-in screen after the server ended the session. */
   notice: string | null;
   setSession: (token: string, staff: AuthenticatedStaff, tenant: TenantSummary) => void;
-  confirmSession: (staff: AuthenticatedStaff, tenant: TenantSummary) => void;
+  confirmSession: (staff: AuthenticatedStaff, tenant: TenantSummary, impersonation?: SupportView | null) => void;
   clearSession: (notice?: string | null) => void;
   clearNotice: () => void;
 }
@@ -42,18 +49,19 @@ export const useAuthStore = create<AuthState>((set) => ({
   status: storedToken === null ? 'anonymous' : 'verifying',
   staff: null,
   tenant: null,
+  impersonation: null,
   notice: null,
   setSession: (token, staff, tenant) => {
     writeStorage(TOKEN_KEY, token);
     writeStorage(WORKSPACE_KEY, tenant.workspace);
-    set({ token, staff, tenant, status: 'authenticated', notice: null });
+    set({ token, staff, tenant, impersonation: null, status: 'authenticated', notice: null });
   },
-  confirmSession: (staff, tenant) => {
-    set({ staff, tenant, status: 'authenticated' });
+  confirmSession: (staff, tenant, impersonation = null) => {
+    set({ staff, tenant, impersonation, status: 'authenticated' });
   },
   clearSession: (notice = null) => {
     removeStorage(TOKEN_KEY);
-    set({ token: null, staff: null, tenant: null, status: 'anonymous', notice });
+    set({ token: null, staff: null, tenant: null, impersonation: null, status: 'anonymous', notice });
   },
   clearNotice: () => {
     set({ notice: null });
@@ -96,4 +104,13 @@ export function connectAuthStoreToApiClient(): void {
     if (event.newValue === null && token !== null) clearSession();
     else if (event.newValue !== null && event.newValue !== token) window.location.reload();
   });
+}
+
+/**
+ * Opens a support view in this browser: the console hands over a read-only
+ * owner token, stored like any session so the restaurant app loads normally.
+ */
+export function storeSupportViewToken(token: string, workspace: string): void {
+  writeStorage(TOKEN_KEY, token);
+  writeStorage(WORKSPACE_KEY, workspace);
 }

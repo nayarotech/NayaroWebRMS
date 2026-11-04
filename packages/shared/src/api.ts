@@ -108,6 +108,8 @@ export interface LoginResponse {
 export interface MeResponse {
   readonly staff: AuthenticatedStaff;
   readonly tenant: TenantSummary;
+  /** Set when Nayaro support is viewing as this person (read-only). */
+  readonly impersonation?: { readonly adminName: string; readonly expiresAt: string } | null;
 }
 
 export interface WorkspaceLookupResponse {

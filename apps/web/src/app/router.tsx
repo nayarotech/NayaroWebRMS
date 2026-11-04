@@ -58,6 +58,27 @@ const AvailabilityScreen = lazy(() =>
 const PayrollScreen = lazy(() =>
   import('@/screens/PayrollScreen').then((module) => ({ default: module.PayrollScreen })),
 );
+const PlatformShell = lazy(() =>
+  import('@/features/platform/PlatformShell').then((module) => ({ default: module.PlatformShell })),
+);
+const PlatformLoginScreen = lazy(() =>
+  import('@/screens/platform/PlatformLoginScreen').then((module) => ({ default: module.PlatformLoginScreen })),
+);
+const PlatformOverviewScreen = lazy(() =>
+  import('@/screens/platform/PlatformOverviewScreen').then((module) => ({ default: module.PlatformOverviewScreen })),
+);
+const PlatformTenantsScreen = lazy(() =>
+  import('@/screens/platform/PlatformTenantsScreen').then((module) => ({ default: module.PlatformTenantsScreen })),
+);
+const PlatformTenantScreen = lazy(() =>
+  import('@/screens/platform/PlatformTenantScreen').then((module) => ({ default: module.PlatformTenantScreen })),
+);
+const PlatformSignupsScreen = lazy(() =>
+  import('@/screens/platform/PlatformSignupsScreen').then((module) => ({ default: module.PlatformSignupsScreen })),
+);
+const PlatformActivityScreen = lazy(() =>
+  import('@/screens/platform/PlatformActivityScreen').then((module) => ({ default: module.PlatformActivityScreen })),
+);
 const LandingScreen = lazy(() =>
   import('@/screens/LandingScreen').then((module) => ({ default: module.LandingScreen })),
 );
@@ -92,6 +113,19 @@ function guard(allow: (staff: AuthenticatedStaff) => boolean, element: ReactNode
  */
 export const router = createBrowserRouter([
   { path: '/m/:workspace', element: <GuestMenuScreen /> },
+  // The Nayaro console: its own accounts and guard, outside the restaurant app.
+  { path: '/admin/login', element: <PlatformLoginScreen /> },
+  {
+    path: '/admin',
+    element: <PlatformShell />,
+    children: [
+      { index: true, element: <PlatformOverviewScreen /> },
+      { path: 'restaurants', element: <PlatformTenantsScreen /> },
+      { path: 'restaurants/:id', element: <PlatformTenantScreen /> },
+      { path: 'signups', element: <PlatformSignupsScreen /> },
+      { path: 'activity', element: <PlatformActivityScreen /> },
+    ],
+  },
   {
     element: <PublicRoute />,
     children: [

@@ -9,6 +9,7 @@ import {
   type TenantStatus,
 } from '@nayaro/database';
 import { setTenantStatus } from '../src/modules/tenant/tenant.service';
+import { upsertPlatformAdmin } from '../src/modules/platform/platform.auth';
 import { loadEnvironment, resolveDatabaseLocation } from './env';
 import { resetTenantData } from './reset-tenant-data';
 
@@ -23,6 +24,7 @@ const USAGE = `Usage:
   npm run tenant -- list
   npm run tenant -- status <workspace> --set TRIAL|ACTIVE|SUSPENDED|CANCELLED [--until YYYY-MM-DD|never] [--reason text]
   npm run tenant -- reset-data <workspace> [--execute]
+  npm run tenant -- admin <email> --name "Full Name" --password "..."   (create or reset a Nayaro console admin)
 
 reset-data previews by default. Stop the API before --execute.
 Keeps staff, menu, floor plan, settings, offers, recipes, payroll profiles and security logs.
@@ -38,6 +40,8 @@ const { positionals, values } = parseArgs({
     set: { type: 'string' },
     until: { type: 'string' },
     reason: { type: 'string' },
+    name: { type: 'string' },
+    password: { type: 'string' },
     execute: { type: 'boolean', default: false },
   },
 });
@@ -74,6 +78,11 @@ try {
         orders: tenant._count.orders,
       })),
     );
+  } else if (command === 'admin' && workspace) {
+    // `workspace` is the email here: the second positional.
+    if (!values.name || !values.password) throw new Error('admin needs --name and --password.');
+    const admin = await upsertPlatformAdmin(prisma, { email: workspace, name: values.name, password: values.password });
+    console.log(`Console admin ready: ${admin.name} <${admin.email}>. Sign in at /admin/login.`);
   } else if (command === 'reset-data' && workspace) {
     if (!toDatabaseUrl(databaseFilePath).startsWith('file:')) {
       throw new Error('reset-data supports local SQLite databases only.');

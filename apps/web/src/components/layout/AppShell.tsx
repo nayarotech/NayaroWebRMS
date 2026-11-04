@@ -5,6 +5,7 @@ import { useRealtimeRecovery } from '@/hooks/useRealtimeRecovery';
 import { readStorage, writeStorage } from '@/lib/storage';
 import { LoadingState } from '@/components/ui/States';
 import { Sidebar } from './Sidebar';
+import { SupportViewBanner } from './SupportViewBanner';
 import { Header } from './Header';
 
 const COLLAPSED_KEY = 'nayaro.sidebar.collapsed';
@@ -52,6 +53,7 @@ export function AppShell(): JSX.Element {
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
+        <SupportViewBanner />
         <Header
           onOpenMenu={() => {
             setMobileOpen(true);

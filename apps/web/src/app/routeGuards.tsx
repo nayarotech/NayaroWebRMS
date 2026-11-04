@@ -46,7 +46,7 @@ function useVerifySession(): { failed: boolean; retry: () => void } {
     let cancelled = false;
     fetchCurrentSession()
       .then((session) => {
-        if (!cancelled) confirmSession(session.staff, session.tenant);
+        if (!cancelled) confirmSession(session.staff, session.tenant, session.impersonation ?? null);
       })
       .catch((error: unknown) => {
         // A rejected token is handled by the API client, which signs out.

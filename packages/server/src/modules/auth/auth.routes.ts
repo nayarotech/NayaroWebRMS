@@ -92,7 +92,12 @@ export function createAuthRouter(deps: AuthRouterDeps): Router {
   /** Authenticated. Confirms the token and drives which UI is shown. */
   router.get('/auth/me', async (req, res) => {
     const { staff } = requireAuthContext(req);
-    res.json({ staff, tenant: await getTenantSummary(deps.prisma, staff.restaurantId) });
+    res.json({
+      staff,
+      tenant: await getTenantSummary(deps.prisma, staff.restaurantId),
+      // Drives the "read-only support view" banner.
+      impersonation: req.auth?.impersonation ?? null,
+    });
   });
 
   router.post('/auth/logout', async (req, res) => {

@@ -2,7 +2,7 @@ import { hasServicePermission, type ServicePermission } from '@nayaro/shared';
 import type { RequestHandler } from 'express';
 import type { NayaroPrismaClient, StaffRole } from '@nayaro/database';
 import { ApiError } from '../utils/apiError';
-import { checkSession } from '../modules/auth/session.service';
+import { checkSession, type SessionImpersonation } from '../modules/auth/session.service';
 import { tenantBlockedError } from '../modules/tenant/tenant.service';
 import type { AuthenticatedStaff } from '../modules/auth/auth.types';
 
@@ -25,6 +25,7 @@ declare global {
       auth?: {
         readonly sessionId: string;
         readonly staff: AuthenticatedStaff;
+        readonly impersonation?: SessionImpersonation;
       };
     }
   }
@@ -86,6 +87,13 @@ export function createAuthenticationMiddleware(deps: AuthenticationDeps): Reques
       return;
     }
 
+    // The platform console has its own accounts and its own guard
+    // (modules/platform/platform.auth.ts); restaurant tokens never open it.
+    if (req.path === '/platform' || req.path.startsWith('/platform/')) {
+      next();
+      return;
+    }
+
     const token = readBearerToken(req.header('authorization'));
     if (token === null) {
       next(new ApiError(401, 'UNAUTHENTICATED', 'Sign in to continue.'));
@@ -96,6 +104,16 @@ export function createAuthenticationMiddleware(deps: AuthenticationDeps): Reques
       .then((result) => {
         if (result.ok) {
           req.auth = result.session;
+          // A support view is look-only: nothing it does can change the
+          // restaurant's data. Signing out (ending the view) is the exception.
+          if (
+            result.session.impersonation !== undefined &&
+            !['GET', 'HEAD'].includes(req.method.toUpperCase()) &&
+            req.path !== '/auth/logout'
+          ) {
+            next(new ApiError(403, 'READ_ONLY_SUPPORT_VIEW', 'This is a read-only support view. Nothing can be changed.'));
+            return;
+          }
           next();
           return;
         }

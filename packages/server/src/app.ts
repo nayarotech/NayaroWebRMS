@@ -5,6 +5,7 @@ import { createCorsMiddleware } from './middleware/cors';
 import { createSecurityHeaders } from './middleware/securityHeaders';
 import { createRateLimit } from './middleware/rateLimit';
 import { createTenantRouter } from './modules/tenant/tenant.routes';
+import { createPlatformRouter } from './modules/platform/platform.routes';
 import type { Mailer } from './modules/email/mailer';
 import { createAuditRouter } from './modules/audit/audit.routes';
 import { createErrorHandler } from './middleware/errorHandler';
@@ -100,6 +101,7 @@ export function createNayaroApp(deps: CreateNayaroAppDeps): Express {
         : { registrationsPerHour: deps.registrationsPerHour }),
     }),
   );
+  app.use(createPlatformRouter({ prisma: deps.prisma, logger: deps.logger.child('platform') }));
   app.use(createAuditRouter(deps.prisma));
   app.use(createAuthRouter({ prisma: deps.prisma, logger: deps.logger.child('auth') }));
   app.use(

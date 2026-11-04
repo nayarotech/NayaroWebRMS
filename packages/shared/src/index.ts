@@ -11,3 +11,4 @@ export * from './customerMenu';
 export * from './offers';
 export * from './loyalty';
 export * from './payroll';
+export * from './platform';

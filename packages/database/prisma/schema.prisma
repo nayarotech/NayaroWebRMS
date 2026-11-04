@@ -360,6 +360,11 @@ model Session {
   ipAddress   String?
   userAgent   String?
 
+  /// Set when a Nayaro platform admin opened this session to view the
+  /// restaurant as its owner. Such sessions are read-only and short-lived.
+  impersonatedByAdminId String?
+  impersonatorName      String?
+
   @@index([staffId])
   @@index([restaurantId, expiresAt])
 }
@@ -1303,4 +1308,34 @@ model PendingRegistration {
   expiresAt  DateTime
   lastSentAt DateTime
   createdAt  DateTime @default(now())
+}
+
+/// A Nayaro Technology operator. Entirely separate from restaurant Staff:
+/// created only from the operator CLI, never by sign-up, and signed in at
+/// /admin with its own sessions.
+model PlatformAdmin {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String
+  passwordHash String
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+
+  sessions PlatformSession[]
+}
+
+model PlatformSession {
+  id         String        @id @default(cuid())
+  adminId    String
+  admin      PlatformAdmin @relation(fields: [adminId], references: [id], onDelete: Restrict)
+  tokenHash  String        @unique
+  createdAt  DateTime      @default(now())
+  expiresAt  DateTime
+  lastSeenAt DateTime      @default(now())
+  revokedAt  DateTime?
+  ipAddress  String?
+  userAgent  String?
+
+  @@index([adminId])
 }
